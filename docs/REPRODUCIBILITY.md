@@ -2,16 +2,36 @@
 
 This guide explains how to generate and analyze ROFA runs in a reproducible way.
 
-## Colab generation
+## Generation (GPU required)
 
-1. Open `notebooks/10_colab_generate.ipynb`.
-2. Install dependencies and mount Google Drive.
-3. Run the `scripts/generate.py` CLI with your output directory on Drive.
+Generation requires a GPU. Colab is supported and recommended for most users.
+
+### Colab notebooks
+
+1. Open `notebooks/01_colab_generate_greedy.ipynb` or `notebooks/02_colab_generate_branches.ipynb`.
+2. Install dependencies, mount Google Drive, and set your output base path.
+3. Run the single CLI command cell to start generation.
 
 The generator writes `summary.jsonl` incrementally and saves `progress.json` after
- each example, making it safe to resume after Colab restarts.
+each example, making it safe to resume after Colab restarts. Re-running the same
+command with the same `--out-dir` and `--run-id` continues from the next example.
 
-## Local analysis
+### CLI example
+
+```bash
+python scripts/generate.py \
+  --method branches \
+  --n 200 \
+  --seed 42 \
+  --branches 10 \
+  --temperature 0.8 \
+  --out-dir /content/drive/MyDrive/rofa_runs \
+  --run-id example_run
+```
+
+## Analysis (CPU-only)
+
+Analysis runs locally without a GPU as long as you have the saved run folder.
 
 1. Download or mount the run directory created in Colab.
 2. Run `scripts/analyze.py` against `summary.jsonl` to compute aggregate metrics.

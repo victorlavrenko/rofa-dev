@@ -57,7 +57,7 @@ Contains:
 
 - `run_id`: unique identifier.
 - `created_at`: ISO UTC timestamp.
-- `method`: `greedy` or `branch_sampling`.
+- `method`: `greedy` or `branches`.
 - `config`: the run configuration (dataset, seeds, generation parameters).
 
 ## `progress.json`
