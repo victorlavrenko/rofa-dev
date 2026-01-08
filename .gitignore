@@ -12,3 +12,5 @@ __pycache__/
 *.pt
 *.bin
 *.safetensors
+*.zip
+*.csv
