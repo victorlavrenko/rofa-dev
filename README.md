@@ -155,16 +155,16 @@ ROFA is an exploration tool, not a product.
 ## How to use this repository (high level)
 
 1. **Generate logs** (GPU / Colab)
-   - Run `scripts/generate.py` or the Colab notebook
+   - Run `scripts/generate.py` or the Colab notebooks
    - Logs are written incrementally and safely
 
 2. **Analyze logs** (local, CPU)
-   - Run `scripts/analyze.py` or the analysis notebook
+   - Run `scripts/analyze.py` or `notebooks/20_paper_reproduce.ipynb`
    - No model access required
 
 3. **Publish results**
    - Zip the run directory
-   - Upload to GitHub Releases
+   - Upload to GitHub Releases (manual)
    - Others can reproduce all metrics from logs alone
 
 See `docs/REPRODUCIBILITY.md` for details.
@@ -175,15 +175,24 @@ See `docs/REPRODUCIBILITY.md` for details.
 
 ### Run Greedy on Colab
 
-1. Open `notebooks/01_colab_generate_greedy.ipynb`.
+1. Open `notebooks/10_colab_generate_greedy.ipynb` or launch it in Colab:
+   - https://colab.research.google.com/github/victorlavrenko/rofa/blob/main/notebooks/10_colab_generate_greedy.ipynb
 2. Update `N`, `SEED`, or `OUT_BASE` if desired.
 3. Run all cells. Outputs are written directly to Google Drive.
 
 ### Run Branches on Colab
 
-1. Open `notebooks/02_colab_generate_branches.ipynb`.
+1. Open `notebooks/11_colab_generate_branches.ipynb` or launch it in Colab:
+   - https://colab.research.google.com/github/victorlavrenko/rofa/blob/main/notebooks/11_colab_generate_branches.ipynb
 2. Update `N`, `SEED`, `BRANCHES`, or `OUT_BASE` if desired.
 3. Run all cells. Outputs are written directly to Google Drive.
+
+### Reproduce paper figures
+
+1. Open `notebooks/20_paper_reproduce.ipynb` or launch it in Colab:
+   - https://colab.research.google.com/github/victorlavrenko/rofa/blob/main/notebooks/20_paper_reproduce.ipynb
+2. Provide a local run folder or a Release asset URL.
+3. Run the analysis cells and export reports.
 
 ### Where outputs are saved
 
@@ -201,7 +210,7 @@ Each run contains:
 
 ### How to resume after crash
 
-Re-run the exact same command with the same `--out-dir` and `--run-id`.
+Re-run the exact same command with the same `--out-dir` (and `--run-id` if used).
 The generator detects `progress.json` and continues without duplicating records.
 
 ### How to upload a run folder to GitHub Releases

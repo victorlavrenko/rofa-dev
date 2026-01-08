@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
+import urllib.request
+import zipfile
 from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -55,3 +58,19 @@ def load_progress(path: str) -> Optional[Dict[str, Any]]:
         return None
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def download(url: str, dest: str) -> str:
+    """Download a file from a URL to the destination path."""
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    with urllib.request.urlopen(url) as response, open(dest, "wb") as f:
+        shutil.copyfileobj(response, f)
+    return dest
+
+
+def unpack_zip(zip_path: str, dst_dir: str) -> str:
+    """Unpack a zip file into a destination directory."""
+    os.makedirs(dst_dir, exist_ok=True)
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        zf.extractall(dst_dir)
+    return dst_dir

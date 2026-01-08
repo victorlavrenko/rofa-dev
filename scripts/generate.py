@@ -39,8 +39,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    run_id = args.run_id or uuid.uuid4().hex
-    run_dir = os.path.join(args.out_dir, run_id)
+    if args.run_id:
+        run_id = args.run_id
+        run_dir = os.path.join(args.out_dir, run_id)
+    else:
+        run_dir = args.out_dir
+        run_id = os.path.basename(os.path.abspath(run_dir)) or uuid.uuid4().hex
     os.makedirs(run_dir, exist_ok=True)
 
     progress_path = os.path.join(run_dir, "progress.json")
