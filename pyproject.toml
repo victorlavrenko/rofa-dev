@@ -1,20 +1,56 @@
 [project]
 name = "rofa"
 version = "0.1.0"
-description = "Refactor of ROFA notebook into a research-grade repo"
+description = "ROFA: research code for greedy vs multi-branch sampling experiments and reproducible analysis"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+authors = [{ name = "Victor Lavrenko" }]
+keywords = ["llm", "reasoning", "evaluation", "sampling", "research"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+]
 
 dependencies = [
+  # Keep unpinned if you prefer, but this is the realistic minimal set people expect.
   "torch",
   "transformers",
   "datasets",
+
+  # Frequently needed in modern HF setups; safe to include and avoids surprises.
+  "accelerate",
+  "safetensors",
+  "tqdm",
+  "numpy",
+  "pandas",
 ]
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = [
+  "pytest",
+]
+dev = [
+  "ruff",
+]
+
+[project.urls]
+Homepage = "https://github.com/victorlavrenko/rofa"
+Repository = "https://github.com/victorlavrenko/rofa"
+Issues = "https://github.com/victorlavrenko/rofa/issues"
 
 [build-system]
-requires = ["setuptools", "wheel"]
+# Pin to avoid old setuptools in build isolation (important for editable / py312).
+requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
+
+# Critical: make package discovery explicit so editable/wheel builds are stable.
+[tool.setuptools]
+packages = { find = { where = ["."] , include = ["rofa*"] } }
+
+# If you have non-code files inside rofa/ that must ship, keep this.
+[tool.setuptools.package-data]
+rofa = ["py.typed"]
