@@ -171,6 +171,53 @@ See `docs/REPRODUCIBILITY.md` for details.
 
 ---
 
+## Colab quickstart
+
+### Run Greedy on Colab
+
+1. Open `notebooks/01_colab_generate_greedy.ipynb`.
+2. Update `N`, `SEED`, or `OUT_BASE` if desired.
+3. Run all cells. Outputs are written directly to Google Drive.
+
+### Run Branches on Colab
+
+1. Open `notebooks/02_colab_generate_branches.ipynb`.
+2. Update `N`, `SEED`, `BRANCHES`, or `OUT_BASE` if desired.
+3. Run all cells. Outputs are written directly to Google Drive.
+
+### Where outputs are saved
+
+Runs are written under:
+
+```
+<out-dir>/<run-id>/
+```
+
+Each run contains:
+
+- `summary.jsonl`
+- `manifest.json`
+- `progress.json`
+
+### How to resume after crash
+
+Re-run the exact same command with the same `--out-dir` and `--run-id`.
+The generator detects `progress.json` and continues without duplicating records.
+
+### How to upload a run folder to GitHub Releases
+
+1. Zip the run directory:
+   ```bash
+   python scripts/pack_run.py --run-dir /path/to/<run-id>
+   ```
+2. Upload the resulting `.zip` to a GitHub Release.
+3. Reviewers can validate the artifacts locally:
+   ```bash
+   python scripts/validate_run.py --run-dir /path/to/<run-id>
+   ```
+
+---
+
 ## Status
 
 This repository represents **ROFA – Baseline Experiment (v1)**.

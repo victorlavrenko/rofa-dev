@@ -15,8 +15,15 @@ from rofa.schemas import RunConfig, RunManifest
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate ROFA run artifacts.")
-    parser.add_argument("--method", choices=["greedy", "branch_sampling"], required=True)
-    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--method", choices=["greedy", "branches"], required=True)
+    parser.add_argument("--out-dir", required=True)
+    parser.add_argument("--run-id")
+    parser.add_argument(
+        "--resume",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Resume from existing progress.json when available.",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-new-tokens", type=int, default=1024)
     parser.add_argument("--n", type=int, default=100)
@@ -32,15 +39,32 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    os.makedirs(args.output_dir, exist_ok=True)
+    run_id = args.run_id or uuid.uuid4().hex
+    run_dir = os.path.join(args.out_dir, run_id)
+    os.makedirs(run_dir, exist_ok=True)
 
-    progress_path = os.path.join(args.output_dir, "progress.json")
-    manifest_path = os.path.join(args.output_dir, "manifest.json")
-    summary_path = os.path.join(args.output_dir, "summary.jsonl")
-    full_path = os.path.join(args.output_dir, "full.jsonl")
+    progress_path = os.path.join(run_dir, "progress.json")
+    manifest_path = os.path.join(run_dir, "manifest.json")
+    summary_path = os.path.join(run_dir, "summary.jsonl")
+    full_path = os.path.join(run_dir, "full.jsonl")
 
     progress = load_progress(progress_path)
-    run_id = progress.get("run_id") if progress else uuid.uuid4().hex
+    resume = args.resume if args.resume is not None else bool(progress)
+    if progress:
+        progress_run_id = progress.get("run_id")
+        if progress_run_id and progress_run_id != run_id:
+            raise ValueError(
+                f"Run ID mismatch: progress has {progress_run_id} but --run-id is {run_id}."
+            )
+        if not resume:
+            raise ValueError(
+                "progress.json exists but --no-resume was set; refuse to overwrite artifacts."
+            )
+    else:
+        if resume and os.path.exists(summary_path):
+            raise ValueError(
+                "summary.jsonl exists but no progress.json was found; cannot safely resume."
+            )
 
     tokenizer = load_tokenizer()
     model = load_model_with_fallback()
@@ -67,10 +91,10 @@ def main() -> None:
         max_per_subject=args.n / args.subjects * 1.1 + 1,
         dataset_name=args.dataset_name,
         dataset_split=args.dataset_split,
-        n_branches=args.branches if args.method == "branch_sampling" else None,
-        temperature=args.temperature if args.method == "branch_sampling" else None,
-        top_p=args.top_p if args.method == "branch_sampling" else None,
-        top_k=args.top_k if args.method == "branch_sampling" else None,
+        n_branches=args.branches if args.method == "branches" else None,
+        temperature=args.temperature if args.method == "branches" else None,
+        top_p=args.top_p if args.method == "branches" else None,
+        top_k=args.top_k if args.method == "branches" else None,
     )
 
     if not os.path.exists(manifest_path):
