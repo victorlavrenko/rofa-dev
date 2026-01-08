@@ -4,19 +4,18 @@ from __future__ import annotations
 
 import argparse
 import os
-import uuid
 
-from rofa.io import _now_utc, load_progress, write_manifest
 from rofa.methods import BranchSamplingEnsemble, GreedyDecode
 from rofa.model import MODEL_ID, load_model_with_fallback, load_tokenizer
-from rofa.runner import run_dataset_loop
-from rofa.schemas import RunConfig, RunManifest
+from rofa.question_set import create_question_set, load_question_set, save_question_set
+from rofa.runner import run_generation
+from rofa.schemas import GenerationConfig
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate ROFA run artifacts.")
-    parser.add_argument("--method", choices=["greedy", "branches"], required=True)
-    parser.add_argument("--out-dir", required=True)
+    parser.add_argument("--method", choices=["greedy", "branches"])
+    parser.add_argument("--out-dir")
     parser.add_argument("--run-id")
     parser.add_argument(
         "--resume",
@@ -24,6 +23,9 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Resume from existing progress.json when available.",
     )
+    parser.add_argument("--question-set", dest="question_set_path")
+    parser.add_argument("--create-question-set", action="store_true")
+    parser.add_argument("--question-set-out", "--out", dest="question_set_out")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-new-tokens", type=int, default=1024)
     parser.add_argument("--n", type=int, default=100)
@@ -39,43 +41,41 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    if args.run_id:
-        run_id = args.run_id
-        run_dir = os.path.join(args.out_dir, run_id)
-    else:
-        run_dir = args.out_dir
-        run_id = os.path.basename(os.path.abspath(run_dir)) or uuid.uuid4().hex
-    os.makedirs(run_dir, exist_ok=True)
+    if args.create_question_set:
+        qs_path = args.question_set_out or args.question_set_path
+        if not qs_path:
+            raise ValueError("--create-question-set requires --question-set-out or --question-set.")
+        if os.path.exists(qs_path):
+            qs = load_question_set(qs_path)
+            print(f"Using existing question set at {qs_path} (qs_id={qs.qs_id})")
+        else:
+            qs = create_question_set(
+                {"dataset_name": args.dataset_name, "dataset_split": args.dataset_split},
+                {
+                    "seed": args.seed,
+                    "n": args.n,
+                    "subjects": args.subjects,
+                    "max_per_subject": args.n / args.subjects * 1.1 + 1,
+                },
+            )
+            save_question_set(qs, qs_path)
+            print(f"Saved question set to {qs_path} (qs_id={qs.qs_id})")
+        if not args.method:
+            return
+        if not args.question_set_path:
+            args.question_set_path = qs_path
 
-    progress_path = os.path.join(run_dir, "progress.json")
-    manifest_path = os.path.join(run_dir, "manifest.json")
-    summary_path = os.path.join(run_dir, "summary.jsonl")
-    full_path = os.path.join(run_dir, "full.jsonl")
-
-    progress = load_progress(progress_path)
-    resume = args.resume if args.resume is not None else bool(progress)
-    if progress:
-        progress_run_id = progress.get("run_id")
-        if progress_run_id and progress_run_id != run_id:
-            raise ValueError(
-                f"Run ID mismatch: progress has {progress_run_id} but --run-id is {run_id}."
-            )
-        if not resume:
-            raise ValueError(
-                "progress.json exists but --no-resume was set; refuse to overwrite artifacts."
-            )
-    else:
-        if resume and os.path.exists(summary_path):
-            raise ValueError(
-                "summary.jsonl exists but no progress.json was found; cannot safely resume."
-            )
+    if not args.method:
+        raise ValueError("--method is required when running generation.")
+    if not args.out_dir:
+        raise ValueError("--out-dir is required when running generation.")
 
     tokenizer = load_tokenizer()
     model = load_model_with_fallback()
 
     if args.method == "greedy":
         method = GreedyDecode()
-        full_output = None
+        write_full_records = False
     else:
         method = BranchSamplingEnsemble(
             n_branches=args.branches,
@@ -83,48 +83,34 @@ def main() -> None:
             top_p=args.top_p,
             top_k=args.top_k,
         )
-        full_output = full_path
+        write_full_records = True
 
-    config = RunConfig(
+    config = GenerationConfig(
         method=args.method,
         model_id=MODEL_ID,
+        out_dir=args.out_dir,
+        run_id=args.run_id,
+        resume=args.resume,
         seed=args.seed,
         max_new_tokens=args.max_new_tokens,
         n=args.n,
         subjects=args.subjects,
-        max_per_subject=args.n / args.subjects * 1.1 + 1,
         dataset_name=args.dataset_name,
         dataset_split=args.dataset_split,
+        question_set_path=args.question_set_path,
         n_branches=args.branches if args.method == "branches" else None,
         temperature=args.temperature if args.method == "branches" else None,
         top_p=args.top_p if args.method == "branches" else None,
         top_k=args.top_k if args.method == "branches" else None,
-    )
-
-    if not os.path.exists(manifest_path):
-        manifest = RunManifest(
-            run_id=run_id,
-            created_at=_now_utc(),
-            method=args.method,
-            config=config,
-        )
-        write_manifest(manifest_path, manifest)
-
-    run_dataset_loop(
-        method=method,
-        output_summary_path=summary_path,
-        output_full_path=full_output,
-        progress_path=progress_path,
-        dataset_name=args.dataset_name,
-        dataset_split=args.dataset_split,
-        seed=args.seed,
-        n=args.n,
-        subjects=args.subjects,
-        max_new_tokens=args.max_new_tokens,
+        progress=True,
+        heartbeat_every=10,
+        write_full_records=write_full_records,
         tokenizer=tokenizer,
         model=model,
-        run_id=run_id,
+        method_impl=method,
     )
+
+    run_generation(config)
 
 
 if __name__ == "__main__":

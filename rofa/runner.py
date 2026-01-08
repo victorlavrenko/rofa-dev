@@ -2,133 +2,242 @@
 
 from __future__ import annotations
 
-from collections import Counter
+import os
+import time
+import uuid
 from typing import Any, Dict, Optional
 
-from datasets import load_dataset
+from tqdm.auto import tqdm
 
-from .io import _append_jsonl, _now_utc, load_progress, write_progress
+from .io import _append_jsonl, _now_utc, load_progress, write_manifest, write_progress
 from .parse import cop_to_letter
+from .question_set import (
+    create_question_set,
+    load_filtered_dataset,
+    load_question_set,
+    question_hash,
+    save_question_set,
+)
+from .schemas import GenerationConfig, RunConfig, RunManifest
 
 
-def load_filtered_dataset(dataset_name: str, split: str):
-    """Load and filter the dataset with the same criteria as the notebook."""
-    ds = load_dataset(dataset_name, split=split)
-    ds = ds.filter(
-        lambda x: (
-            x.get("choice_type") == "single"
-            and isinstance(x.get("exp"), str)
-            and len(x["exp"]) > 20
-            and len(x["exp"]) < 500
-        )
-    )
-    return ds
+def _resolve_example(ds, entry: Dict[str, Any], id_index_cache: Dict[str, int]) -> Dict[str, Any]:
+    dataset_index = entry.get("dataset_index")
+    if dataset_index is not None and 0 <= dataset_index < len(ds):
+        return ds[dataset_index]
+
+    example_id = entry.get("id")
+    if example_id is None:
+        raise ValueError("Question set entry missing dataset_index and id.")
+
+    if example_id in id_index_cache:
+        return ds[id_index_cache[example_id]]
+
+    for idx, ex in enumerate(ds):
+        if ex.get("id") == example_id:
+            id_index_cache[example_id] = idx
+            return ex
+
+    raise ValueError(f"Could not resolve example id {example_id}.")
 
 
-def run_dataset_loop(
+def _update_progress_bar(
+    bar: tqdm,
     *,
-    method,
-    output_summary_path: str,
-    output_full_path: Optional[str],
-    progress_path: str,
-    dataset_name: str,
-    dataset_split: str,
-    seed: int,
-    n: int,
-    subjects: int,
-    max_new_tokens: int,
-    tokenizer,
-    model,
-    run_id: str,
-) -> Dict[str, Any]:
-    """Run the dataset loop with subject balancing and resume support."""
-    max_per_subject = n / subjects * 1.1 + 1
+    completed: int,
+    total: int,
+    start_time: float,
+    heartbeat: Optional[str] = None,
+) -> None:
+    elapsed = time.time() - start_time
+    avg = elapsed / max(1, completed)
+    remaining = max(0.0, (total - completed) * avg)
+    ex_per_sec = completed / max(1e-9, elapsed)
+    bar.set_postfix(
+        {
+            "elapsed_s": f"{elapsed:0.1f}",
+            "eta_s": f"{remaining:0.1f}",
+            "ex/s": f"{ex_per_sec:0.2f}",
+        }
+    )
+    if heartbeat:
+        bar.write(heartbeat)
 
-    ds = load_filtered_dataset(dataset_name, dataset_split)
-    shuffled = ds.shuffle(seed=seed)
+
+def run_generation(config: GenerationConfig) -> Dict[str, Any]:
+    """Run a generation job based on a question set."""
+    if config.tokenizer is None or config.model is None or config.method_impl is None:
+        raise ValueError("GenerationConfig must include tokenizer, model, and method_impl.")
+    if config.run_id:
+        run_id = config.run_id
+        run_dir = os.path.join(config.out_dir, run_id)
+    else:
+        run_dir = config.out_dir
+        run_id = os.path.basename(os.path.abspath(run_dir)) or uuid.uuid4().hex
+
+    os.makedirs(run_dir, exist_ok=True)
+
+    progress_path = os.path.join(run_dir, "progress.json")
+    manifest_path = os.path.join(run_dir, "manifest.json")
+    summary_path = os.path.join(run_dir, "summary.jsonl")
+    full_path = os.path.join(run_dir, "full.jsonl")
+    question_set_path = os.path.join(run_dir, "question_set.json")
 
     progress = load_progress(progress_path)
+    resume = config.resume if config.resume is not None else bool(progress)
     if progress:
-        i = progress.get("i", 0)
-        picked = progress.get("picked", 0)
-        subject_counts = Counter(progress.get("subject_counts", {}))
+        progress_run_id = progress.get("run_id")
+        if progress_run_id and progress_run_id != run_id:
+            raise ValueError(
+                f"Run ID mismatch: progress has {progress_run_id} but run_id is {run_id}."
+            )
+        if not resume:
+            raise ValueError(
+                "progress.json exists but resume was disabled; refuse to overwrite artifacts."
+            )
+    else:
+        if resume and os.path.exists(summary_path):
+            raise ValueError(
+                "summary.jsonl exists but no progress.json was found; cannot safely resume."
+            )
+
+    dataset_cfg = {
+        "dataset_name": config.dataset_name,
+        "dataset_split": config.dataset_split,
+    }
+    selection_cfg = {
+        "seed": config.seed,
+        "n": config.n,
+        "subjects": config.subjects,
+        "max_per_subject": config.n / config.subjects * 1.1 + 1,
+    }
+
+    if os.path.exists(question_set_path):
+        qs = load_question_set(question_set_path)
+    elif config.question_set_path:
+        qs = load_question_set(config.question_set_path)
+        save_question_set(qs, question_set_path)
+    else:
+        qs = create_question_set(dataset_cfg, selection_cfg)
+        save_question_set(qs, question_set_path)
+
+    if config.question_set_path and os.path.exists(question_set_path):
+        loaded_qs = load_question_set(question_set_path)
+        if loaded_qs.qs_id != qs.qs_id:
+            raise ValueError("Question set mismatch between run directory and provided path.")
+
+    if not os.path.exists(manifest_path):
+        run_config = RunConfig(
+            method=config.method,
+            model_id=config.model_id,
+            seed=config.seed,
+            max_new_tokens=config.max_new_tokens,
+            n=config.n,
+            subjects=config.subjects,
+            max_per_subject=selection_cfg["max_per_subject"],
+            dataset_name=config.dataset_name,
+            dataset_split=config.dataset_split,
+            n_branches=config.n_branches,
+            temperature=config.temperature,
+            top_p=config.top_p,
+            top_k=config.top_k,
+            question_set_id=qs.qs_id,
+        )
+        manifest = RunManifest(
+            run_id=run_id,
+            created_at=_now_utc(),
+            method=config.method,
+            config=run_config,
+        )
+        write_manifest(manifest_path, manifest)
+
+    ds = load_filtered_dataset(config.dataset_name, config.dataset_split)
+
+    if progress:
+        position = progress.get("position", 0)
         summary_written = progress.get("summary_written", 0)
         full_written = progress.get("full_written", 0)
     else:
-        i = 0
-        picked = 0
-        subject_counts = Counter()
+        position = 0
         summary_written = 0
         full_written = 0
-        open(output_summary_path, "w", encoding="utf-8").close()
-        if output_full_path:
-            open(output_full_path, "w", encoding="utf-8").close()
+        open(summary_path, "w", encoding="utf-8").close()
+        if config.write_full_records:
+            open(full_path, "w", encoding="utf-8").close()
 
-    while picked < n and i < len(shuffled):
-        ex = shuffled[i]
+    total = len(qs.examples)
+    segment_total = total - position
+    bar = None
+    start_time = time.time()
+    if config.progress:
+        bar = tqdm(total=total, initial=position, dynamic_ncols=True)
+
+    id_index_cache: Dict[str, int] = {}
+    completed_since_start = 0
+
+    for idx in range(position, total):
+        entry = qs.examples[idx]
+        ex = _resolve_example(ds, entry, id_index_cache)
+        entry_hash = entry.get("question_hash")
+        if entry_hash and question_hash(ex) != entry_hash:
+            print(f"  Warning: question hash mismatch at index {idx}.")
         subj = ex.get("subject_name", "Unknown") or "Unknown"
 
-        if subject_counts[subj] >= max_per_subject:
-            i += 1
-            write_progress(
-                progress_path,
-                {
-                    "run_id": run_id,
-                    "timestamp": _now_utc(),
-                    "i": i,
-                    "picked": picked,
-                    "subject_counts": dict(subject_counts),
-                    "summary_written": summary_written,
-                    "full_written": full_written,
-                },
-            )
-            continue
-
-        subject_counts[subj] += 1
-        picked += 1
-
         context = {
-            "tokenizer": tokenizer,
-            "model": model,
-            "max_new_tokens": max_new_tokens,
-            "seed": seed,
-            "index": i,
-            "picked_index": picked,
+            "tokenizer": config.tokenizer,
+            "model": config.model,
+            "max_new_tokens": config.max_new_tokens,
+            "seed": config.seed,
+            "index": idx,
+            "picked_index": idx + 1,
             "subject_name": subj,
             "gold": cop_to_letter(ex["cop"]),
         }
 
-        record = method.run_one(ex, context)
-        _append_jsonl(output_summary_path, record)
+        record = config.method_impl.run_one(ex, context)
+        _append_jsonl(summary_path, record)
         summary_written += 1
 
-        full_record = getattr(method, "last_full_record", None)
-        if output_full_path and full_record is not None:
-            _append_jsonl(output_full_path, full_record)
+        full_record = getattr(config.method_impl, "last_full_record", None)
+        if config.write_full_records and full_record is not None:
+            _append_jsonl(full_path, full_record)
             full_written += 1
 
         if record.get("prediction") is None and "prediction" in record:
             print("  Warning: could not extract answer from model output.")
-            picked -= 1
 
-        i += 1
+        position = idx + 1
+        completed_since_start += 1
 
         write_progress(
             progress_path,
             {
                 "run_id": run_id,
                 "timestamp": _now_utc(),
-                "i": i,
-                "picked": picked,
-                "subject_counts": dict(subject_counts),
+                "position": position,
                 "summary_written": summary_written,
                 "full_written": full_written,
             },
         )
 
+        if bar:
+            bar.update(1)
+            heartbeat = None
+            if config.heartbeat_every and completed_since_start % config.heartbeat_every == 0:
+                heartbeat = f"heartbeat: summary_written={summary_written}"
+            _update_progress_bar(
+                bar,
+                completed=completed_since_start,
+                total=segment_total,
+                start_time=start_time,
+                heartbeat=heartbeat,
+            )
+
+    if bar:
+        bar.close()
+
     return {
         "summary_written": summary_written,
         "full_written": full_written,
-        "picked": picked,
-        "i": i,
+        "position": position,
     }
