@@ -173,18 +173,11 @@ See `docs/REPRODUCIBILITY.md` for details.
 
 ## Colab quickstart
 
-### Run Greedy on Colab
+### Run Greedy and Branches on Colab
 
-1. Open `notebooks/10_colab_generate_greedy.ipynb` or launch it in Colab:
-   - https://colab.research.google.com/github/victorlavrenko/rofa/blob/main/notebooks/10_colab_generate_greedy.ipynb
+1. Open `notebooks/10_colab_generate.ipynb` or launch it in Colab:
+   - https://colab.research.google.com/github/victorlavrenko/rofa/blob/main/notebooks/10_colab_generate.ipynb
 2. Update `N`, `SEED`, or `OUT_BASE` if desired.
-3. Run all cells. Outputs are written directly to Google Drive.
-
-### Run Branches on Colab
-
-1. Open `notebooks/11_colab_generate_branches.ipynb` or launch it in Colab:
-   - https://colab.research.google.com/github/victorlavrenko/rofa/blob/main/notebooks/11_colab_generate_branches.ipynb
-2. Update `N`, `SEED`, `BRANCHES`, or `OUT_BASE` if desired.
 3. Run all cells. Outputs are written directly to Google Drive.
 
 ### Reproduce paper figures
