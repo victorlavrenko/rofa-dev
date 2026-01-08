@@ -23,6 +23,35 @@ class RunConfig:
     temperature: Optional[float] = None
     top_p: Optional[float] = None
     top_k: Optional[int] = None
+    question_set_id: Optional[str] = None
+
+
+@dataclass
+class GenerationConfig:
+    """Inputs required to run generation."""
+
+    method: str
+    model_id: str
+    out_dir: str
+    run_id: Optional[str] = None
+    resume: Optional[bool] = None
+    seed: int = 42
+    max_new_tokens: int = 1024
+    n: int = 100
+    subjects: int = 20
+    dataset_name: str = "openlifescienceai/medmcqa"
+    dataset_split: str = "validation"
+    question_set_path: Optional[str] = None
+    n_branches: Optional[int] = None
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    top_k: Optional[int] = None
+    progress: bool = False
+    heartbeat_every: int = 10
+    write_full_records: bool = False
+    tokenizer: Optional[Any] = None
+    model: Optional[Any] = None
+    method_impl: Optional[Any] = None
 
 
 @dataclass
