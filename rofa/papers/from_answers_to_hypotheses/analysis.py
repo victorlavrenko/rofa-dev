@@ -159,7 +159,7 @@ def max_frac_distribution(
     if "max_frac" not in df_branches.columns:
         raise ValueError("DataFrame does not contain max_frac.")
     max_frac = cast(pd.Series, df_branches["max_frac"])
-    categories = pd.cut(max_frac, bins=bins, include_lowest=True)
+    categories = cast(pd.Series, pd.cut(max_frac, bins=bins, include_lowest=True))
     return categories.value_counts().sort_index()
 
 
@@ -186,7 +186,7 @@ def rw_other_breakdown(
         .size()
         .unstack(fill_value=0)
     )
-    return breakdown
+    return cast(pd.DataFrame, breakdown)
 
 
 def paper_metrics(df_summary: pd.DataFrame) -> Dict[str, object]:
@@ -208,7 +208,7 @@ def unanimous_wrong(df_branches: pd.DataFrame) -> pd.DataFrame:
         raise ValueError("DataFrame does not contain unanimous fields.")
     max_frac = cast(pd.Series, df_branches["max_frac"])
     leader_correct = cast(pd.Series, df_branches["leader_correct"])
-    return df_branches[(max_frac == 1.0) & (leader_correct == False)]
+    return cast(pd.DataFrame, df_branches.loc[(max_frac == 1.0) & (leader_correct == False)])
 
 
 def subject_accuracy(df_summary: pd.DataFrame, accuracy_field: str = "leader_correct") -> pd.Series:
