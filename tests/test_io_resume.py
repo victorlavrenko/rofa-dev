@@ -1,4 +1,4 @@
-from rofa.io import load_progress, write_progress
+from rofa.core.io import load_progress, write_progress
 
 
 def test_progress_roundtrip(tmp_path):

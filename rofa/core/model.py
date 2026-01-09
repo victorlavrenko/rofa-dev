@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import time
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from .parse import _extract_impl, cop_to_letter, extract_choice_letter
-from .prompts import SYSTEM, build_user
 
 MODEL_ID = "HPAI-BSC/Llama3.1-Aloe-Beta-8B"
 
@@ -61,6 +60,8 @@ def infer_one(
     model,
     max_new_tokens: int = 512,
     *,
+    system_prompt: str,
+    build_user_prompt: Callable[[dict], str],
     seed: Optional[int] = None,
     temperature: Optional[float] = None,
     do_sample: Optional[bool] = None,
@@ -90,8 +91,8 @@ def infer_one(
         temperature = 1.0
 
     messages = [
-        {"role": "system", "content": SYSTEM},
-        {"role": "user", "content": build_user(example)},
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": build_user_prompt(example)},
     ]
 
     prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)

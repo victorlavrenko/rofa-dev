@@ -5,16 +5,19 @@ from __future__ import annotations
 import argparse
 import os
 
-from rofa.methods import BranchSamplingEnsemble, GreedyDecode
-from rofa.model import MODEL_ID, load_model_with_fallback, load_tokenizer
-from rofa.question_set import create_question_set, load_question_set, save_question_set
-from rofa.runner import run_generation
-from rofa.schemas import GenerationConfig
+from rofa.core.model import MODEL_ID, load_model_with_fallback, load_tokenizer
+from rofa.core.question_set import create_question_set, load_question_set, save_question_set
+from rofa.core.registry import get_paper
+from rofa.core.runner import run_generation
+from rofa.core.schemas import GenerationConfig
+from rofa.papers.from_answers_to_hypotheses import config as default_paper_config
+from rofa.papers.from_answers_to_hypotheses.methods import BranchSamplingEnsemble, GreedyDecode
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate ROFA run artifacts.")
-    parser.add_argument("--method", choices=["greedy", "branches"])
+    parser.add_argument("--paper", default=default_paper_config.PAPER_ID)
+    parser.add_argument("--method")
     parser.add_argument("--out-dir")
     parser.add_argument("--run-id")
     parser.add_argument(
@@ -30,8 +33,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-new-tokens", type=int, default=1024)
     parser.add_argument("--n", type=int, default=100)
     parser.add_argument("--subjects", type=int, default=20)
-    parser.add_argument("--dataset-name", default="openlifescienceai/medmcqa")
-    parser.add_argument("--dataset-split", default="validation")
+    parser.add_argument("--dataset-name")
+    parser.add_argument("--dataset-split")
     parser.add_argument("--branches", type=int, default=10)
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--top-p", type=float, default=0.8)
@@ -41,6 +44,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    paper = get_paper(args.paper)
+    args.dataset_name = args.dataset_name or paper.default_dataset
+    args.dataset_split = args.dataset_split or paper.default_split
     if args.create_question_set:
         qs_path = args.question_set_out or args.question_set_path
         if not qs_path:
@@ -67,6 +73,10 @@ def main() -> None:
 
     if not args.method:
         raise ValueError("--method is required when running generation.")
+    if args.method not in paper.methods:
+        raise ValueError(
+            f"--method must be one of {sorted(paper.methods.keys())} for paper {paper.paper_id}."
+        )
     if not args.out_dir:
         raise ValueError("--out-dir is required when running generation.")
 

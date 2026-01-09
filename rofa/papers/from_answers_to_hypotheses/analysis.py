@@ -7,7 +7,7 @@ from typing import Dict, Sequence
 
 import pandas as pd
 
-from .metrics import r_w_other_class, top2_coverage as metrics_top2_coverage
+from rofa.core.metrics import r_w_other_class, top2_coverage as metrics_top2_coverage
 
 
 def load_summary(run_dir: str) -> pd.DataFrame:

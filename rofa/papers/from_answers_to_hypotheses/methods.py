@@ -6,9 +6,10 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from .io import _now_utc
-from .metrics import _correct_fraction, _diversity_metrics
-from .model import MODEL_ID, infer_one
+from rofa.core.io import _now_utc
+from rofa.core.metrics import _correct_fraction, _diversity_metrics
+from rofa.core.model import MODEL_ID, infer_one
+from rofa.papers.from_answers_to_hypotheses.prompts import SYSTEM, build_user
 
 
 @dataclass
@@ -27,6 +28,8 @@ class GreedyDecode:
             example,
             tokenizer,
             model,
+            system_prompt=SYSTEM,
+            build_user_prompt=build_user,
             max_new_tokens=max_new_tokens,
         )
 
@@ -89,6 +92,8 @@ class BranchSamplingEnsemble:
                 example,
                 tokenizer,
                 model,
+                system_prompt=SYSTEM,
+                build_user_prompt=build_user,
                 seed=branch_seed,
                 temperature=self.temperature,
                 max_new_tokens=max_new_tokens,

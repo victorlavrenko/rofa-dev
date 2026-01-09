@@ -2,7 +2,7 @@
 
 ROFA is an experimental research codebase aimed at studying **non-human-like reasoning regimes in large language models**, starting with controlled multi-branch sampling and consensus analysis, and designed to grow toward more advanced forms of reasoning (near-miss analysis, branch interaction, and spatial / 4D imagination).
 
-This repository contains the **code required to reproduce the first ROFA experiment**, as described in the accompanying research note, and is intentionally structured to look and behave like a **serious, reproducible ML research project**, not a one-off notebook.
+This repository contains the **code required to reproduce ROFA experiments across multiple papers**, and is intentionally structured to look and behave like a **serious, reproducible ML research project**, not a one-off notebook.
 
 ---
 
@@ -28,9 +28,20 @@ This allows us to study phenomena that are invisible in standard greedy decoding
 
 ---
 
-## Scope of the current repository
+## Papers and experiments
 
-This repository supports **exactly two reasoning methods**:
+ROFA is now organized **by paper**, with shared infrastructure under `rofa/core/` and
+paper-specific methods, prompts, and analyses under `rofa/papers/<paper_id>/`.
+
+The first paper captured in this repository is:
+
+- **From Answers to Hypotheses: Parallel Clinical Reasoning as a Decision Paradigm for Medical AI**
+  - Paper package: `rofa/papers/from_answers_to_hypotheses/`
+  - Paper manuscript: `docs/papers/from_answers_to_hypotheses/paper.md`
+
+## Scope of the baseline paper
+
+The baseline paper currently supports **exactly two reasoning methods**:
 
 1. **Greedy decoding**
    - Single deterministic generation

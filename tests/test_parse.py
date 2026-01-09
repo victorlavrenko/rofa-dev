@@ -1,4 +1,4 @@
-from rofa.parse import extract_choice_letter
+from rofa.core.parse import extract_choice_letter
 
 
 def test_extract_choice_letter_examples():
