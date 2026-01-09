@@ -200,6 +200,8 @@ Each run contains:
 - `summary.jsonl`
 - `manifest.json`
 - `progress.json`
+- `question_set.json`
+- `full.jsonl` (branches only)
 
 ### How to resume after crash
 
