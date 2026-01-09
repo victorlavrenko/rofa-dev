@@ -10,6 +10,7 @@ Each run directory contains:
 - `full.jsonl` — branch method only; contains full per-branch outputs.
 - `manifest.json` — run metadata and configuration.
 - `progress.json` — resume state for interrupted runs.
+- `question_set.json` — the sampled question set used for the run.
 
 ## `summary.jsonl`
 
@@ -47,9 +48,10 @@ Each line is a JSON object with the fields:
 Each line is a JSON object with:
 
 - Example metadata (index, id, question, options, gold, subject).
-- `branches`: per-branch records (seed, temperature, top_p, top_k, prediction, output).
+- `branches`: per-branch records (seed, temperature, top_p, top_k, pred, model_output).
 - `branch_preds`: list of predictions.
-- `metrics`: per-example metrics, including `class` and timing info.
+- `metrics`: per-example metrics, including `class`, `correct_fraction`, `leader_correct`,
+  `wall_time_sec`, and `mean_branch_time_sec`.
 
 ## `manifest.json`
 
@@ -65,9 +67,7 @@ Contains:
 Contains resume state:
 
 - `run_id`: identifier matching the manifest.
-- `i`: current dataset index.
-- `picked`: number of accepted examples.
-- `subject_counts`: subject histogram.
+- `position`: current dataset index.
 - `summary_written`: number of summary records written.
 - `full_written`: number of full records written.
 - `timestamp`: ISO UTC timestamp.

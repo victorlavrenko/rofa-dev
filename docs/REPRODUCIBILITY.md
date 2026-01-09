@@ -8,9 +8,9 @@ Generation requires a GPU. Colab is supported and recommended for most users.
 
 ### Colab notebooks
 
-1. Open `notebooks/10_colab_generate_greedy.ipynb` or `notebooks/11_colab_generate_branches.ipynb`.
+1. Open `notebooks/10_colab_generate.ipynb`.
 2. Install dependencies, mount Google Drive, and set your output base path.
-3. Run the single CLI command cell to start generation.
+3. Choose the method cell (greedy or branches) and run the CLI command to start generation.
 
 The generator writes `summary.jsonl` incrementally and saves `progress.json` after
 each example, making it safe to resume after Colab restarts. Re-running the same
