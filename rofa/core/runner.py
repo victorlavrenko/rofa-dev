@@ -86,7 +86,7 @@ def _resolve_run_paths(config: GenerationConfig) -> Dict[str, str]:
 
 def _validate_resume(
     *,
-    progress: Dict[str, Any],
+    progress: Optional[Dict[str, Any]],
     resume: bool,
     run_id: str,
     summary_path: str,
@@ -166,7 +166,7 @@ def _ensure_manifest(
 
 def _init_progress_state(
     *,
-    progress: Dict[str, Any],
+    progress: Optional[Dict[str, Any]],
     summary_path: str,
     full_path: str,
     write_full_records: bool,
