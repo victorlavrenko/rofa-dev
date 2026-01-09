@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+from typing import Dict, Mapping, Optional, Sequence, Tuple
 
 # Precompiled regexes
 _STRONG_PATTERNS = [
@@ -96,15 +96,75 @@ def _extract_impl(text: str, *, return_debug: bool = False) -> Tuple[Optional[st
     return last_letter, dbg
 
 
-def extract_choice_letter(text: str) -> Optional[str]:
+def _coerce_options(options: Mapping[str, str] | Sequence[str]) -> Dict[str, str]:
+    if isinstance(options, Mapping):
+        return {str(k).upper(): str(v) for k, v in options.items() if k is not None}
+    if isinstance(options, Sequence):
+        option_list = list(options)
+        if len(option_list) == 4:
+            return {letter: str(value) for letter, value in zip("ABCD", option_list)}
+    return {}
+
+
+def _normalize_option_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+def _option_is_too_short(option: str) -> bool:
+    if len(option) >= 3:
+        return False
+    return not re.search(r"\d", option)
+
+
+def _match_option_text(text: str, options: Mapping[str, str]) -> Optional[str]:
+    if not text:
+        return None
+    tail_norm = _normalize_option_text(text[-800:])
+    if not tail_norm:
+        return None
+
+    candidates = []
+    for letter, option_text in options.items():
+        option_norm = _normalize_option_text(option_text)
+        if not option_norm or _option_is_too_short(option_norm):
+            continue
+        idx = tail_norm.rfind(option_norm)
+        if idx != -1:
+            candidates.append((len(option_norm), idx, letter))
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return candidates[0][2]
+
+
+def extract_choice_letter(
+    text: str,
+    options: Mapping[str, str] | Sequence[str] | None = None,
+) -> Optional[str]:
     """Extract a single answer choice letter from model output."""
     letter, _ = _extract_impl(text, return_debug=False)
-    return letter
+    if letter is not None or not options:
+        return letter
+    option_map = _coerce_options(options)
+    if not option_map:
+        return letter
+    return _match_option_text(text, option_map) or letter
 
 
-def extract_choice_letter_debug(text: str) -> Tuple[Optional[str], Dict[str, int], str]:
+def extract_choice_letter_debug(
+    text: str,
+    options: Mapping[str, str] | Sequence[str] | None = None,
+) -> Tuple[Optional[str], Dict[str, int], str]:
     """Return the extracted letter, score map, and strategy name."""
     letter, dbg = _extract_impl(text, return_debug=True)
+    if letter is None and options:
+        option_map = _coerce_options(options)
+        matched = _match_option_text(text, option_map) if option_map else None
+        if matched is not None:
+            scores = dbg.scores if dbg else {}
+            return matched, scores, "option-text"
     if dbg is None:
         return letter, {}, "unknown"
     return letter, dbg.scores, dbg.method
