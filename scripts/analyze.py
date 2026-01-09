@@ -69,11 +69,11 @@ def analyze_branch(records: List[Dict[str, Any]]) -> Dict[str, Any]:
         else 0.0
     )
 
-    top2_hits = sum(
-        1
-        for r in records
-        if top2_coverage(r.get("branch_preds", []), r.get("gold"))
-    )
+    top2_hits = 0
+    for record in records:
+        gold = record.get("gold")
+        if isinstance(gold, str) and top2_coverage(record.get("branch_preds", []), gold):
+            top2_hits += 1
     top2_rate = top2_hits / total if total else 0.0
 
     r_w_other_counts = {"R": 0, "W": 0, "Other": 0}

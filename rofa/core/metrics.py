@@ -4,7 +4,20 @@ from __future__ import annotations
 
 import math
 from collections import Counter
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Iterable, Optional, Sequence, Tuple, TypedDict
+
+
+class DiversityMetrics(TypedDict):
+    """Structured diversity metrics for branch predictions."""
+
+    leader: Optional[str]
+    max_frac: float
+    variation_ratio: float
+    entropy_bits: float
+    valid_n: int
+    none_n: int
+    unanimous: bool
+    unanim_valid: bool
 
 
 def _safe_counter_preds(preds: Iterable[Optional[str]]) -> Tuple[Counter, int]:
@@ -24,7 +37,7 @@ def _entropy_from_counter(cnt: Counter, total: int) -> float:
     return ent
 
 
-def _diversity_metrics(preds: List[Optional[str]]) -> Dict[str, object]:
+def _diversity_metrics(preds: Sequence[Optional[str]]) -> DiversityMetrics:
     """Compute diversity metrics for branch predictions.
 
     Args:
@@ -70,7 +83,7 @@ def _diversity_metrics(preds: List[Optional[str]]) -> Dict[str, object]:
     }
 
 
-def _correct_fraction(preds: List[Optional[str]], gold: str) -> float:
+def _correct_fraction(preds: Sequence[Optional[str]], gold: str) -> float:
     """Return fraction of valid predictions equal to gold."""
     valid = [p for p in preds if p in ("A", "B", "C", "D")]
     if not valid:
@@ -78,7 +91,7 @@ def _correct_fraction(preds: List[Optional[str]], gold: str) -> float:
     return sum(1 for p in valid if p == gold) / len(valid)
 
 
-def top2_coverage(preds: List[Optional[str]], gold: str) -> bool:
+def top2_coverage(preds: Sequence[Optional[str]], gold: str) -> bool:
     """Return True if gold is among the top-2 most frequent predictions.
 
     Args:
