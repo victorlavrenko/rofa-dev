@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-python -m pyright .
-python -m ruff check .
-python -m pytest
+echo "==> Running pyright"
+pyright .
+
+echo "==> Running ruff"
+ruff check .
+
+echo "==> Running pytest"
+pytest
