@@ -1,7 +1,12 @@
 """Paper package for 'From Answers to Hypotheses'."""
 
 from rofa.papers.from_answers_to_hypotheses.analysis import load_paper_runs, paper_metrics
-from rofa.papers.from_answers_to_hypotheses.config import PAPER_ID, PAPER_SPEC, PAPER_TITLE
+from rofa.papers.from_answers_to_hypotheses.config import (
+    PAPER_ID,
+    PAPER_SPEC,
+    PAPER_TITLE,
+)
+
 
 def default_configs() -> dict:
     """Return default paper configuration values."""

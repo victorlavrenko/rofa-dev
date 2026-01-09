@@ -9,7 +9,8 @@ from typing import Dict, List, Optional, Sequence, Tuple, cast
 import pandas as pd
 
 from rofa.core.io import unpack_zip
-from rofa.core.metrics import r_w_other_class, top2_coverage as metrics_top2_coverage
+from rofa.core.metrics import r_w_other_class
+from rofa.core.metrics import top2_coverage as metrics_top2_coverage
 
 METHOD_GREEDY = "greedy"
 METHOD_K_SAMPLE = "k_sample_ensemble"
@@ -144,7 +145,7 @@ def top2_coverage(df_branches: pd.DataFrame) -> float:
     gold_series = cast(pd.Series, df_branches["gold"])
     hits = sum(
         1
-        for preds, gold in zip(branch_preds, gold_series)
+        for preds, gold in zip(branch_preds, gold_series, strict=False)
         if isinstance(gold, str) and metrics_top2_coverage(preds, gold)
     )
     total = len(df_branches)
@@ -175,7 +176,7 @@ def rw_other_breakdown(
     max_frac = cast(pd.Series, df_branches["max_frac"])
     leader_correct = cast(pd.Series, df_branches["leader_correct"])
     labels = []
-    for mf, lc in zip(max_frac, leader_correct):
+    for mf, lc in zip(max_frac, leader_correct, strict=False):
         lc_value = None if pd.isna(lc) else bool(lc)
         mf_value = float(mf) if pd.notna(mf) else float("nan")
         labels.append(r_w_other_class(mf_value, lc_value))
@@ -207,8 +208,8 @@ def unanimous_wrong(df_branches: pd.DataFrame) -> pd.DataFrame:
     if "max_frac" not in df_branches.columns or "leader_correct" not in df_branches.columns:
         raise ValueError("DataFrame does not contain unanimous fields.")
     max_frac = cast(pd.Series, df_branches["max_frac"])
-    leader_correct = cast(pd.Series, df_branches["leader_correct"])
-    return cast(pd.DataFrame, df_branches.loc[(max_frac == 1.0) & (leader_correct == False)])
+    leader_correct = cast(pd.Series, df_branches["leader_correct"]).fillna(False).astype(bool)
+    return cast(pd.DataFrame, df_branches.loc[(max_frac == 1.0) & (~leader_correct)])
 
 
 def subject_accuracy(df_summary: pd.DataFrame, accuracy_field: str = "leader_correct") -> pd.Series:
@@ -237,7 +238,12 @@ def compute_table_consensus(df_branches: pd.DataFrame) -> pd.DataFrame:
     near_unanimous = near_unanimous_stats(df_branches)
     return pd.DataFrame(
         {
-            "metric": ["unanimous_count", "unanimous_accuracy", "near_unanimous_count", "near_unanimous_accuracy"],
+            "metric": [
+                "unanimous_count",
+                "unanimous_accuracy",
+                "near_unanimous_count",
+                "near_unanimous_accuracy",
+            ],
             "value": [
                 unanimous["count"],
                 unanimous["accuracy"],

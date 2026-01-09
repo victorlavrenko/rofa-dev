@@ -8,7 +8,7 @@ from typing import Callable, List, Optional, Tuple
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from .parse import _extract_impl, cop_to_letter, extract_choice_letter
+from .parse import cop_to_letter, extract_choice_letter
 
 MODEL_ID = "HPAI-BSC/Llama3.1-Aloe-Beta-8B"
 

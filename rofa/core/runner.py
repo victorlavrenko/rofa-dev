@@ -66,6 +66,123 @@ def _update_progress_bar(
         bar.write(heartbeat)
 
 
+def _resolve_run_paths(config: GenerationConfig) -> Dict[str, str]:
+    if config.run_id:
+        run_id = config.run_id
+        run_dir = os.path.join(config.out_dir, run_id)
+    else:
+        run_dir = config.out_dir
+        run_id = os.path.basename(os.path.abspath(run_dir)) or uuid.uuid4().hex
+    return {
+        "run_id": run_id,
+        "run_dir": run_dir,
+        "progress_path": os.path.join(run_dir, "progress.json"),
+        "manifest_path": os.path.join(run_dir, "manifest.json"),
+        "summary_path": os.path.join(run_dir, "summary.jsonl"),
+        "full_path": os.path.join(run_dir, "full.jsonl"),
+        "question_set_path": os.path.join(run_dir, "question_set.json"),
+    }
+
+
+def _validate_resume(
+    *,
+    progress: Dict[str, Any],
+    resume: bool,
+    run_id: str,
+    summary_path: str,
+) -> None:
+    if progress:
+        progress_run_id = progress.get("run_id")
+        if progress_run_id and progress_run_id != run_id:
+            raise ValueError(
+                f"Run ID mismatch: progress has {progress_run_id} but run_id is {run_id}."
+            )
+        if not resume:
+            raise ValueError(
+                "progress.json exists but resume was disabled; refuse to overwrite artifacts."
+            )
+    elif resume and os.path.exists(summary_path):
+        raise ValueError(
+            "summary.jsonl exists but no progress.json was found; cannot safely resume."
+        )
+
+
+def _load_or_create_question_set(
+    config: GenerationConfig,
+    *,
+    question_set_path: str,
+    selection_cfg: Dict[str, Any],
+    dataset_cfg: Dict[str, str],
+):
+    if os.path.exists(question_set_path):
+        qs = load_question_set(question_set_path)
+    elif config.question_set_path:
+        qs = load_question_set(config.question_set_path)
+        save_question_set(qs, question_set_path)
+    else:
+        qs = create_question_set(dataset_cfg, selection_cfg)
+        save_question_set(qs, question_set_path)
+    if config.question_set_path and os.path.exists(question_set_path):
+        loaded_qs = load_question_set(question_set_path)
+        if loaded_qs.qs_id != qs.qs_id:
+            raise ValueError("Question set mismatch between run directory and provided path.")
+    return qs
+
+
+def _ensure_manifest(
+    config: GenerationConfig,
+    *,
+    run_id: str,
+    manifest_path: str,
+    question_set_id: str,
+    selection_cfg: Dict[str, Any],
+) -> None:
+    if os.path.exists(manifest_path):
+        return
+    run_config = RunConfig(
+        method=config.method,
+        model_id=config.model_id,
+        seed=config.seed,
+        max_new_tokens=config.max_new_tokens,
+        n=config.n,
+        subjects=config.subjects,
+        max_per_subject=selection_cfg["max_per_subject"],
+        dataset_name=config.dataset_name,
+        dataset_split=config.dataset_split,
+        n_branches=config.n_branches,
+        temperature=config.temperature,
+        top_p=config.top_p,
+        top_k=config.top_k,
+        question_set_id=question_set_id,
+    )
+    manifest = RunManifest(
+        run_id=run_id,
+        created_at=_now_utc(),
+        method=config.method,
+        config=run_config,
+    )
+    write_manifest(manifest_path, manifest)
+
+
+def _init_progress_state(
+    *,
+    progress: Dict[str, Any],
+    summary_path: str,
+    full_path: str,
+    write_full_records: bool,
+) -> Dict[str, int]:
+    if progress:
+        return {
+            "position": progress.get("position", 0),
+            "summary_written": progress.get("summary_written", 0),
+            "full_written": progress.get("full_written", 0),
+        }
+    open(summary_path, "w", encoding="utf-8").close()
+    if write_full_records:
+        open(full_path, "w", encoding="utf-8").close()
+    return {"position": 0, "summary_written": 0, "full_written": 0}
+
+
 def run_generation(config: GenerationConfig) -> Dict[str, Any]:
     """Run a generation job based on a question set.
 
@@ -92,38 +209,20 @@ def run_generation(config: GenerationConfig) -> Dict[str, Any]:
     """
     if config.tokenizer is None or config.model is None or config.method_impl is None:
         raise ValueError("GenerationConfig must include tokenizer, model, and method_impl.")
-    if config.run_id:
-        run_id = config.run_id
-        run_dir = os.path.join(config.out_dir, run_id)
-    else:
-        run_dir = config.out_dir
-        run_id = os.path.basename(os.path.abspath(run_dir)) or uuid.uuid4().hex
+    paths = _resolve_run_paths(config)
+    run_id = paths["run_id"]
+    run_dir = paths["run_dir"]
+    progress_path = paths["progress_path"]
+    manifest_path = paths["manifest_path"]
+    summary_path = paths["summary_path"]
+    full_path = paths["full_path"]
+    question_set_path = paths["question_set_path"]
 
     os.makedirs(run_dir, exist_ok=True)
 
-    progress_path = os.path.join(run_dir, "progress.json")
-    manifest_path = os.path.join(run_dir, "manifest.json")
-    summary_path = os.path.join(run_dir, "summary.jsonl")
-    full_path = os.path.join(run_dir, "full.jsonl")
-    question_set_path = os.path.join(run_dir, "question_set.json")
-
     progress = load_progress(progress_path)
     resume = config.resume if config.resume is not None else bool(progress)
-    if progress:
-        progress_run_id = progress.get("run_id")
-        if progress_run_id and progress_run_id != run_id:
-            raise ValueError(
-                f"Run ID mismatch: progress has {progress_run_id} but run_id is {run_id}."
-            )
-        if not resume:
-            raise ValueError(
-                "progress.json exists but resume was disabled; refuse to overwrite artifacts."
-            )
-    else:
-        if resume and os.path.exists(summary_path):
-            raise ValueError(
-                "summary.jsonl exists but no progress.json was found; cannot safely resume."
-            )
+    _validate_resume(progress=progress, resume=resume, run_id=run_id, summary_path=summary_path)
 
     dataset_cfg = {
         "dataset_name": config.dataset_name,
@@ -136,58 +235,31 @@ def run_generation(config: GenerationConfig) -> Dict[str, Any]:
         "max_per_subject": config.n / config.subjects * 1.1 + 1,
     }
 
-    if os.path.exists(question_set_path):
-        qs = load_question_set(question_set_path)
-    elif config.question_set_path:
-        qs = load_question_set(config.question_set_path)
-        save_question_set(qs, question_set_path)
-    else:
-        qs = create_question_set(dataset_cfg, selection_cfg)
-        save_question_set(qs, question_set_path)
-
-    if config.question_set_path and os.path.exists(question_set_path):
-        loaded_qs = load_question_set(question_set_path)
-        if loaded_qs.qs_id != qs.qs_id:
-            raise ValueError("Question set mismatch between run directory and provided path.")
-
-    if not os.path.exists(manifest_path):
-        run_config = RunConfig(
-            method=config.method,
-            model_id=config.model_id,
-            seed=config.seed,
-            max_new_tokens=config.max_new_tokens,
-            n=config.n,
-            subjects=config.subjects,
-            max_per_subject=selection_cfg["max_per_subject"],
-            dataset_name=config.dataset_name,
-            dataset_split=config.dataset_split,
-            n_branches=config.n_branches,
-            temperature=config.temperature,
-            top_p=config.top_p,
-            top_k=config.top_k,
-            question_set_id=qs.qs_id,
-        )
-        manifest = RunManifest(
-            run_id=run_id,
-            created_at=_now_utc(),
-            method=config.method,
-            config=run_config,
-        )
-        write_manifest(manifest_path, manifest)
+    qs = _load_or_create_question_set(
+        config,
+        question_set_path=question_set_path,
+        selection_cfg=selection_cfg,
+        dataset_cfg=dataset_cfg,
+    )
+    _ensure_manifest(
+        config,
+        run_id=run_id,
+        manifest_path=manifest_path,
+        question_set_id=qs.qs_id,
+        selection_cfg=selection_cfg,
+    )
 
     ds = load_filtered_dataset(config.dataset_name, config.dataset_split)
 
-    if progress:
-        position = progress.get("position", 0)
-        summary_written = progress.get("summary_written", 0)
-        full_written = progress.get("full_written", 0)
-    else:
-        position = 0
-        summary_written = 0
-        full_written = 0
-        open(summary_path, "w", encoding="utf-8").close()
-        if config.write_full_records:
-            open(full_path, "w", encoding="utf-8").close()
+    progress_state = _init_progress_state(
+        progress=progress,
+        summary_path=summary_path,
+        full_path=full_path,
+        write_full_records=config.write_full_records,
+    )
+    position = progress_state["position"]
+    summary_written = progress_state["summary_written"]
+    full_written = progress_state["full_written"]
 
     total = len(qs.examples)
     segment_total = total - position

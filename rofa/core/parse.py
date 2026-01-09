@@ -42,7 +42,66 @@ class ParseDebug:
     matched_option: Optional[str] = None
 
 
-def _extract_impl(text: str, *, return_debug: bool = False) -> Tuple[Optional[str], Optional[ExtractDebug]]:
+def _extract_strong_match(text: str) -> Optional[Tuple[str, int]]:
+    """Return a strong match letter and pattern index if found."""
+    last: Optional[Tuple[int, str, int]] = None
+    for idx, rx in enumerate(_STRONG_PATTERNS):
+        for match in rx.finditer(text):
+            last = (match.start(1), match.group(1).upper(), idx)
+    if last is None:
+        return None
+    return last[1], last[2]
+
+
+def _score_tail(tail: str) -> Dict[str, int]:
+    scores: Dict[str, int] = {k: 0 for k in "ABCD"}
+
+    for match in _KEYWORD_RX.finditer(tail):
+        window = tail[match.start() : match.start() + 120]
+        for letter in "ABCD":
+            if re.search(rf"\b{letter}\b", window, re.I):
+                scores[letter] += 5
+
+    end_match = _END_LETTER_RX.search(tail)
+    if end_match:
+        scores[end_match.group(1).upper()] += 6
+
+    for match in _PAREN_LETTER_RX.finditer(tail):
+        scores[match.group(1).upper()] += 2
+
+    enum_counts = {k: 0 for k in "ABCD"}
+    for line in tail.splitlines():
+        enum_match = _ENUM_LINE_RX.match(line)
+        if enum_match:
+            enum_counts[enum_match.group(1).upper()] += 1
+
+    if sum(enum_counts.values()) >= 2:
+        for letter in "ABCD":
+            scores[letter] -= min(2, enum_counts[letter])
+
+    return scores
+
+
+def _select_best_score(scores: Dict[str, int]) -> Tuple[str, int]:
+    return max(scores.items(), key=lambda kv: kv[1])
+
+
+def _extract_weak_tail(tail: str) -> Optional[str]:
+    last_letter: Optional[str] = None
+    for match in _WEAK_TAIL_RX.finditer(tail):
+        letter = match.group(1).upper()
+        suffix = tail[match.start() : match.start() + 4]
+        if _ENUM_LINE_RX.match(suffix):
+            continue
+        last_letter = letter
+    return last_letter
+
+
+def _extract_impl(
+    text: str,
+    *,
+    return_debug: bool = False,
+) -> Tuple[Optional[str], Optional[ExtractDebug]]:
     """Return the extracted letter and optional debug metadata."""
     if not text:
         dbg = ExtractDebug(method="empty", scores={}) if return_debug else None
@@ -50,58 +109,24 @@ def _extract_impl(text: str, *, return_debug: bool = False) -> Tuple[Optional[st
 
     t = text.strip()
 
-    # 1) Strong patterns: take the last match across all patterns
-    last: Optional[Tuple[int, str, int]] = None  # (pos, letter, pattern_idx)
-    for idx, rx in enumerate(_STRONG_PATTERNS):
-        for m in rx.finditer(t):
-            last = (m.start(1), m.group(1).upper(), idx)
-
-    if last is not None:
-        letter = last[1]
-        dbg = ExtractDebug(method=f"strong[{last[2]}]", scores={letter: 999}) if return_debug else None
+    strong = _extract_strong_match(t)
+    if strong is not None:
+        letter, pattern_idx = strong
+        dbg = (
+            ExtractDebug(method=f"strong[{pattern_idx}]", scores={letter: 999})
+            if return_debug
+            else None
+        )
         return letter, dbg
 
-    # 2) Tail scoring
     tail = t[-800:]
-    scores: Dict[str, int] = {k: 0 for k in "ABCD"}
-
-    for m in _KEYWORD_RX.finditer(tail):
-        window = tail[m.start() : m.start() + 120]
-        for L in "ABCD":
-            if re.search(rf"\b{L}\b", window, re.I):
-                scores[L] += 5
-
-    m_end = _END_LETTER_RX.search(tail)
-    if m_end:
-        scores[m_end.group(1).upper()] += 6
-
-    for m in _PAREN_LETTER_RX.finditer(tail):
-        scores[m.group(1).upper()] += 2
-
-    enum_counts = {k: 0 for k in "ABCD"}
-    for line in tail.splitlines():
-        mm = _ENUM_LINE_RX.match(line)
-        if mm:
-            enum_counts[mm.group(1).upper()] += 1
-
-    if sum(enum_counts.values()) >= 2:
-        for L in "ABCD":
-            scores[L] -= min(2, enum_counts[L])
-
-    best_letter, best_score = max(scores.items(), key=lambda kv: kv[1])
+    scores = _score_tail(tail)
+    best_letter, best_score = _select_best_score(scores)
     if best_score >= 4:
         dbg = ExtractDebug(method="tail-score", scores=scores) if return_debug else None
         return best_letter, dbg
 
-    # 3) Last resort: last isolated letter token in tail, avoiding enumeration headers
-    last_letter: Optional[str] = None
-    for m in _WEAK_TAIL_RX.finditer(tail):
-        L = m.group(1).upper()
-        suffix = tail[m.start() : m.start() + 4]
-        if _ENUM_LINE_RX.match(suffix):
-            continue
-        last_letter = L
-
+    last_letter = _extract_weak_tail(tail)
     dbg = ExtractDebug(method="weak-tail", scores=scores) if return_debug else None
     return last_letter, dbg
 
@@ -112,7 +137,10 @@ def _coerce_options(options: Mapping[str, str] | Sequence[str]) -> Dict[str, str
     if isinstance(options, Sequence):
         option_list = list(options)
         if len(option_list) == 4:
-            return {letter: str(value) for letter, value in zip("ABCD", option_list)}
+            return {
+                letter: str(value)
+                for letter, value in zip("ABCD", option_list, strict=False)
+            }
     return {}
 
 
@@ -201,7 +229,12 @@ def extract_choice_letter_debug(
         matched = _match_option_text(text, option_map) if option_map else None
         if matched is not None:
             scores = dbg.scores if dbg else {}
-            return ParseDebug(letter=matched, scores=scores, method="option-text", matched_option=matched)
+            return ParseDebug(
+                letter=matched,
+                scores=scores,
+                method="option-text",
+                matched_option=matched,
+            )
     if dbg is None:
         return ParseDebug(letter=letter, scores={}, method="unknown")
     return ParseDebug(letter=letter, scores=dbg.scores, method=dbg.method)
