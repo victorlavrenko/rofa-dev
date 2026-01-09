@@ -33,8 +33,9 @@ def _entropy_from_counter(cnt: Counter, total: int) -> float:
     ent = 0.0
     for _, v in cnt.items():
         p = v / total
-        ent -= p * math.log(p + 1e-12, 2)
-    return ent
+        if p > 0.0:
+            ent -= p * math.log(p, 2)
+    return max(ent, 0.0)
 
 
 def _diversity_metrics(preds: Sequence[Optional[str]]) -> DiversityMetrics:
