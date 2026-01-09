@@ -16,7 +16,10 @@ def test_extract_choice_letter_debug_tail_score():
 
 def test_extract_choice_letter_debug_option_text():
     options = ["cyan", "magenta", "yellow", "black"]
-    debug = extract_choice_letter_debug("Printing uses black ink for the key color.", options=options)
+    debug = extract_choice_letter_debug(
+        "Printing uses black ink for the key color.", 
+        options=options
+    )
     assert debug.letter == "D"
     assert debug.method == "option-text"
     assert debug.matched_option == "D"
