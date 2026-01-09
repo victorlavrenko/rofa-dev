@@ -63,3 +63,7 @@ select = ["E", "F", "I", "B", "C90"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
