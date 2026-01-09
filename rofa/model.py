@@ -124,6 +124,12 @@ def infer_one(
     t1 = time.time()
 
     gen = tokenizer.decode(out[0][inputs["input_ids"].shape[-1] :], skip_special_tokens=True)
-    pred = extract_choice_letter(gen)
+    options = {
+        "A": example.get("opa"),
+        "B": example.get("opb"),
+        "C": example.get("opc"),
+        "D": example.get("opd"),
+    }
+    pred = extract_choice_letter(gen, options=options)
     gold = cop_to_letter(example["cop"])
     return pred, gold, gen, t1 - t0
