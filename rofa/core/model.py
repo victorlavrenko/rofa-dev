@@ -102,7 +102,7 @@ def infer_one(
         torch.cuda.synchronize()
     t0 = time.time()
 
-    gen_kwargs = dict(
+    gen_kwargs: dict[str, object] = dict(
         **inputs,
         max_new_tokens=max_new_tokens,
         do_sample=do_sample,

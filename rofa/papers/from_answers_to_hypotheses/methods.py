@@ -17,6 +17,7 @@ class MethodProtocol(Protocol):
 
     def run_one(self, example: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Run the method on a single example and return a summary record."""
+        ...
 
 
 @dataclass

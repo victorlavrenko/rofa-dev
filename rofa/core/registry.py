@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, Protocol
+from typing import Any, Callable, Dict, Protocol
 
 
 class Method(Protocol):
     """Protocol for method implementations used by the core runner."""
 
-    def run_one(self, example, context):
+    def run_one(self, example: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Run the method on a single example and return a summary record."""
 
 

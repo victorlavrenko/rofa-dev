@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, cast
 
 import pandas as pd
 
@@ -87,9 +87,12 @@ def load_paper_runs(
 def accuracy_greedy(df_greedy: pd.DataFrame) -> float:
     """Compute greedy accuracy from a summary DataFrame."""
     if "prediction" in df_greedy.columns and "gold" in df_greedy.columns:
-        return (df_greedy["prediction"] == df_greedy["gold"]).mean()
+        predictions = cast(pd.Series, df_greedy["prediction"])
+        gold = cast(pd.Series, df_greedy["gold"])
+        return float((predictions == gold).mean())
     if "is_correct" in df_greedy.columns:
-        return df_greedy["is_correct"].fillna(False).astype(bool).mean()
+        is_correct = cast(pd.Series, df_greedy["is_correct"])
+        return float(is_correct.fillna(False).astype(bool).mean())
     raise ValueError("DataFrame does not contain greedy prediction fields.")
 
 
@@ -97,17 +100,23 @@ def accuracy_leader(df_branches: pd.DataFrame) -> float:
     """Compute leader accuracy from a branch summary DataFrame."""
     if "leader_correct" not in df_branches.columns:
         raise ValueError("DataFrame does not contain leader_correct.")
-    return df_branches["leader_correct"].fillna(False).astype(bool).mean()
+    leader_correct = cast(pd.Series, df_branches["leader_correct"])
+    return float(leader_correct.fillna(False).astype(bool).mean())
 
 
 def unanimous_stats(df_branches: pd.DataFrame) -> Dict[str, float]:
     """Compute unanimous count and accuracy for max_frac == 1.0."""
     if "max_frac" not in df_branches.columns:
         raise ValueError("DataFrame does not contain max_frac.")
-    unanimous = df_branches[df_branches["max_frac"] == 1.0]
+    max_frac = cast(pd.Series, df_branches["max_frac"])
+    unanimous = df_branches[max_frac == 1.0]
     count = len(unanimous)
     accuracy = (
-        unanimous["leader_correct"].fillna(False).astype(bool).mean() if count else 0.0
+        float(
+            cast(pd.Series, unanimous["leader_correct"]).fillna(False).astype(bool).mean()
+        )
+        if count
+        else 0.0
     )
     return {"count": count, "accuracy": accuracy}
 
@@ -116,9 +125,14 @@ def near_unanimous_stats(df_branches: pd.DataFrame, threshold: float = 0.9) -> D
     """Compute near-unanimous count and accuracy for max_frac >= threshold."""
     if "max_frac" not in df_branches.columns:
         raise ValueError("DataFrame does not contain max_frac.")
-    near = df_branches[df_branches["max_frac"] >= threshold]
+    max_frac = cast(pd.Series, df_branches["max_frac"])
+    near = df_branches[max_frac >= threshold]
     count = len(near)
-    accuracy = near["leader_correct"].fillna(False).astype(bool).mean() if count else 0.0
+    accuracy = (
+        float(cast(pd.Series, near["leader_correct"]).fillna(False).astype(bool).mean())
+        if count
+        else 0.0
+    )
     return {"count": count, "accuracy": accuracy}
 
 
@@ -126,10 +140,12 @@ def top2_coverage(df_branches: pd.DataFrame) -> float:
     """Compute top-2 coverage rate for branch predictions."""
     if "branch_preds" not in df_branches.columns or "gold" not in df_branches.columns:
         raise ValueError("DataFrame does not contain branch_preds/gold.")
+    branch_preds = cast(pd.Series, df_branches["branch_preds"])
+    gold_series = cast(pd.Series, df_branches["gold"])
     hits = sum(
         1
-        for preds, gold in zip(df_branches["branch_preds"], df_branches["gold"])
-        if metrics_top2_coverage(preds, gold)
+        for preds, gold in zip(branch_preds, gold_series)
+        if isinstance(gold, str) and metrics_top2_coverage(preds, gold)
     )
     total = len(df_branches)
     return hits / total if total else 0.0
@@ -142,7 +158,8 @@ def max_frac_distribution(
     """Return a histogram of max_frac across bins."""
     if "max_frac" not in df_branches.columns:
         raise ValueError("DataFrame does not contain max_frac.")
-    categories = pd.cut(df_branches["max_frac"], bins=bins, include_lowest=True)
+    max_frac = cast(pd.Series, df_branches["max_frac"])
+    categories = pd.cut(max_frac, bins=bins, include_lowest=True)
     return categories.value_counts().sort_index()
 
 
@@ -155,11 +172,14 @@ def rw_other_breakdown(
         raise ValueError("DataFrame does not contain max_frac.")
     if "leader_correct" not in df_branches.columns:
         raise ValueError("DataFrame does not contain leader_correct.")
+    max_frac = cast(pd.Series, df_branches["max_frac"])
+    leader_correct = cast(pd.Series, df_branches["leader_correct"])
     labels = []
-    for mf, lc in zip(df_branches["max_frac"], df_branches["leader_correct"]):
+    for mf, lc in zip(max_frac, leader_correct):
         lc_value = None if pd.isna(lc) else bool(lc)
-        labels.append(r_w_other_class(mf, lc_value))
-    bins_series = pd.cut(df_branches["max_frac"], bins=bins, include_lowest=True)
+        mf_value = float(mf) if pd.notna(mf) else float("nan")
+        labels.append(r_w_other_class(mf_value, lc_value))
+    bins_series = pd.cut(max_frac, bins=bins, include_lowest=True)
     breakdown = (
         pd.DataFrame({"bin": bins_series, "label": labels})
         .groupby(["bin", "label"])
@@ -186,7 +206,9 @@ def unanimous_wrong(df_branches: pd.DataFrame) -> pd.DataFrame:
     """Return unanimous-but-wrong cases for branch runs."""
     if "max_frac" not in df_branches.columns or "leader_correct" not in df_branches.columns:
         raise ValueError("DataFrame does not contain unanimous fields.")
-    return df_branches[(df_branches["max_frac"] == 1.0) & (df_branches["leader_correct"] == False)]
+    max_frac = cast(pd.Series, df_branches["max_frac"])
+    leader_correct = cast(pd.Series, df_branches["leader_correct"])
+    return df_branches[(max_frac == 1.0) & (leader_correct == False)]
 
 
 def subject_accuracy(df_summary: pd.DataFrame, accuracy_field: str = "leader_correct") -> pd.Series:
@@ -195,7 +217,8 @@ def subject_accuracy(df_summary: pd.DataFrame, accuracy_field: str = "leader_cor
         raise ValueError("DataFrame does not contain subject_name.")
     if accuracy_field not in df_summary.columns:
         raise ValueError(f"DataFrame does not contain {accuracy_field}.")
-    return df_summary.groupby("subject_name")[accuracy_field].mean().sort_values(ascending=False)
+    grouped = df_summary.groupby("subject_name")[accuracy_field].mean()
+    return cast(pd.Series, grouped).sort_values(ascending=False)
 
 
 def compute_table_accuracy(df_greedy: pd.DataFrame, df_branches: pd.DataFrame) -> pd.DataFrame:

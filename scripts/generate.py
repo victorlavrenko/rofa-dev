@@ -133,7 +133,7 @@ def main() -> None:
         model=model,
         method_impl=method,
     )
-    result = run_generation(config)
+    run_generation(config)
     run_dir = os.path.join(args.out_dir, args.run_id) if args.run_id else args.out_dir
     summary_path = os.path.join(run_dir, "summary.jsonl")
     manifest_path = os.path.join(run_dir, "manifest.json")
@@ -145,7 +145,7 @@ def main() -> None:
     print("Artifacts:")
     for path in artifacts:
         print(f"  - {path}")
-    return result
+    return None
 
 
 if __name__ == "__main__":
