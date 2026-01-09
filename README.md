@@ -2,7 +2,7 @@
 
 ROFA is an experimental research codebase aimed at studying **non-human-like reasoning regimes in large language models**, starting with controlled multi-branch sampling and consensus analysis, and designed to grow toward more advanced forms of reasoning (near-miss analysis, branch interaction, and spatial / 4D imagination).
 
-This repository contains the **code required to reproduce ROFA experiments across multiple papers**, and is intentionally structured to look and behave like a **serious, reproducible ML research project**, not a one-off notebook.
+This repository contains the code required to reproduce ROFA experiments across multiple papers, and currently has only one experiment.
 
 ---
 
