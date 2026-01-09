@@ -33,6 +33,19 @@ This allows us to study phenomena that are invisible in standard greedy decoding
 ROFA is now organized **by paper**, with shared infrastructure under `rofa/core/` and
 paper-specific methods, prompts, and analyses under `rofa/papers/<paper_id>/`.
 
+### Multi-paper architecture (umbrella repo)
+
+- **Core toolkit**: `rofa/core/` (dataset selection, parsing, metrics, run I/O)
+- **Paper packages**: `rofa/papers/<paper_slug>/` (prompts, methods, paper analysis glue)
+- **Paper docs**: `docs/papers/<paper_slug>/`
+- **Notebooks**: `notebooks/` (generation + reproduction)
+
+### Choose your paper
+
+- `from_answers_to_hypotheses`
+  - Paper package: `rofa/papers/from_answers_to_hypotheses/`
+  - Paper manuscript: `docs/papers/from_answers_to_hypotheses/paper.md`
+
 The first paper captured in this repository is:
 
 - **From Answers to Hypotheses: Parallel Clinical Reasoning as a Decision Paradigm for Medical AI**
@@ -47,7 +60,7 @@ The baseline paper currently supports **exactly two reasoning methods**:
    - Single deterministic generation
    - Standard baseline
 
-2. **Branch sampling ensemble (10 branches)**
+2. **K-sample ensemble (10 branches; CLI alias: `branches`)**
    - 10 independent sampled generations
    - Same prompt, same question
    - Aggregation and consensus analysis over answers
@@ -180,11 +193,23 @@ ROFA is an exploration tool, not a product.
 
 See `docs/REPRODUCIBILITY.md` for details.
 
+## Reproduce paper results
+
+- Notebook: `notebooks/20_paper_reproduce.ipynb`
+- Paper doc: `docs/papers/from_answers_to_hypotheses/paper.md`
+
+## Non-Python quickstart (Colab + download)
+
+1. Open `notebooks/10_colab_generate.ipynb` in Colab and run the bootstrap cell.
+2. Run the greedy and k-sample ensemble cells (two runs; same question set).
+3. Download the run folders as zip files.
+4. Open `notebooks/20_paper_reproduce.ipynb`, paste local paths or zip paths, and run.
+
 ---
 
 ## Colab quickstart
 
-### Run Greedy and Branches on Colab
+### Run Greedy and k-sample ensemble on Colab
 
 1. Open `notebooks/10_colab_generate.ipynb` or launch it in Colab:
    - https://colab.research.google.com/github/victorlavrenko/rofa/blob/main/notebooks/10_colab_generate.ipynb
@@ -212,7 +237,7 @@ Each run contains:
 - `manifest.json`
 - `progress.json`
 - `question_set.json`
-- `full.jsonl` (branches only)
+  - `full.jsonl` (k-sample ensemble only)
 
 ### How to resume after crash
 

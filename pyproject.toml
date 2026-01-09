@@ -54,3 +54,12 @@ packages = { find = { where = ["."] , include = ["rofa*"] } }
 # If you have non-code files inside rofa/ that must ship, keep this.
 [tool.setuptools.package-data]
 rofa = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "C90"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10

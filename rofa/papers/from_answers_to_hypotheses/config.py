@@ -23,10 +23,10 @@ METHODS = {
         factory=GreedyDecode,
         description="Single greedy decoding pass.",
     ),
-    "branches": MethodSpec(
-        key="branches",
+    "k_sample_ensemble": MethodSpec(
+        key="k_sample_ensemble",
         factory=BranchSamplingEnsemble,
-        description="Parallel branch sampling with consensus metrics.",
+        description="Multi-sample ensemble (branch sampling) with consensus metrics.",
     ),
 }
 

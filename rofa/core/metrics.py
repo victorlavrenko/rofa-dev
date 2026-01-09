@@ -25,16 +25,15 @@ def _entropy_from_counter(cnt: Counter, total: int) -> float:
 
 
 def _diversity_metrics(preds: List[Optional[str]]) -> Dict[str, object]:
-    """
+    """Compute diversity metrics for branch predictions.
+
+    Args:
+        preds: List of branch predictions (A/B/C/D or None).
+
     Returns:
-      - leader: most common answer among A/B/C/D (or None)
-      - max_frac: leader share among valid preds
-      - variation_ratio: 1 - max_frac (0 means unanimous among valid preds)
-      - entropy_bits: Shannon entropy (0..2 for 4-way)
-      - valid_n: how many branches produced A/B/C/D
-      - none_n: how many are None/invalid
-      - unanimous: all *valid* preds identical AND valid_n == len(preds)
-      - unanim_valid: all valid preds identical (ignores missing)
+        A dictionary with leader, max_frac, entropy, and unanimity statistics:
+        ``leader``, ``max_frac``, ``variation_ratio``, ``entropy_bits``, ``valid_n``,
+        ``none_n``, ``unanimous``, and ``unanim_valid``.
     """
     cnt, valid_n = _safe_counter_preds(preds)
     none_n = len(preds) - valid_n
@@ -80,7 +79,19 @@ def _correct_fraction(preds: List[Optional[str]], gold: str) -> float:
 
 
 def top2_coverage(preds: List[Optional[str]], gold: str) -> bool:
-    """Return True if gold is among the top-2 most frequent predictions."""
+    """Return True if gold is among the top-2 most frequent predictions.
+
+    Args:
+        preds: Branch predictions (A/B/C/D or None).
+        gold: Gold label.
+
+    Returns:
+        True if gold is in the top-2 most frequent predictions.
+
+    Stability:
+        This definition matches the baseline paper and should remain unchanged across
+        papers unless a protocol version is incremented.
+    """
     cnt, valid_n = _safe_counter_preds(preds)
     if valid_n == 0:
         return False
@@ -89,7 +100,12 @@ def top2_coverage(preds: List[Optional[str]], gold: str) -> bool:
 
 
 def r_w_other_class(max_frac: float, leader_correct: Optional[bool]) -> str:
-    """Classify based on consensus bins used in the original notebook."""
+    """Classify based on consensus bins used in the original notebook.
+
+    Stability:
+        This binning matches the baseline paper and should not change without a
+        protocol version bump.
+    """
     if leader_correct is None:
         return "Other"
     if max_frac >= 0.8:

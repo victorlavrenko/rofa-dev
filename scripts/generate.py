@@ -7,7 +7,7 @@ import os
 
 from rofa.core.model import MODEL_ID, load_model_with_fallback, load_tokenizer
 from rofa.core.question_set import create_question_set, load_question_set, save_question_set
-from rofa.core.registry import get_paper
+from rofa.core.registry import get_paper, list_method_aliases, resolve_method_key
 from rofa.core.runner import run_generation
 from rofa.core.schemas import GenerationConfig
 from rofa.papers.from_answers_to_hypotheses import config as default_paper_config
@@ -15,11 +15,12 @@ from rofa.papers.from_answers_to_hypotheses.methods import BranchSamplingEnsembl
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for generation."""
     parser = argparse.ArgumentParser(description="Generate ROFA run artifacts.")
     parser.add_argument("--paper", default=default_paper_config.PAPER_ID)
-    parser.add_argument("--method")
-    parser.add_argument("--out-dir")
-    parser.add_argument("--run-id")
+    parser.add_argument("--method", help="greedy or branches (alias for k_sample_ensemble)")
+    parser.add_argument("--out-dir", help="Output directory for the run artifacts.")
+    parser.add_argument("--run-id", help="Optional run identifier appended to --out-dir.")
     parser.add_argument(
         "--resume",
         action=argparse.BooleanOptionalAction,
@@ -43,6 +44,16 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run generation using a preselected paper/method configuration.
+
+    Artifacts:
+        Writes run artifacts under ``--out-dir`` (manifest, progress, question set,
+        summary, and full records for k-sample ensemble).
+
+    Failure modes:
+        Raises ValueError for missing configuration, unsupported methods, or mismatched
+        question sets when resuming.
+    """
     args = parse_args()
     paper = get_paper(args.paper)
     args.dataset_name = args.dataset_name or paper.default_dataset
@@ -73,9 +84,12 @@ def main() -> None:
 
     if not args.method:
         raise ValueError("--method is required when running generation.")
-    if args.method not in paper.methods:
+    method_key = resolve_method_key(args.method)
+    if method_key not in paper.methods:
+        aliases = list(list_method_aliases().keys())
         raise ValueError(
-            f"--method must be one of {sorted(paper.methods.keys())} for paper {paper.paper_id}."
+            f"--method must be one of {sorted(paper.methods.keys())} or aliases {aliases} "
+            f"for paper {paper.paper_id}."
         )
     if not args.out_dir:
         raise ValueError("--out-dir is required when running generation.")
@@ -83,7 +97,7 @@ def main() -> None:
     tokenizer = load_tokenizer()
     model = load_model_with_fallback()
 
-    if args.method == "greedy":
+    if method_key == "greedy":
         method = GreedyDecode()
         write_full_records = False
     else:
@@ -96,7 +110,7 @@ def main() -> None:
         write_full_records = True
 
     config = GenerationConfig(
-        method=args.method,
+        method=method_key,
         model_id=MODEL_ID,
         out_dir=args.out_dir,
         run_id=args.run_id,
@@ -108,10 +122,10 @@ def main() -> None:
         dataset_name=args.dataset_name,
         dataset_split=args.dataset_split,
         question_set_path=args.question_set_path,
-        n_branches=args.branches if args.method == "branches" else None,
-        temperature=args.temperature if args.method == "branches" else None,
-        top_p=args.top_p if args.method == "branches" else None,
-        top_k=args.top_k if args.method == "branches" else None,
+        n_branches=args.branches if method_key != "greedy" else None,
+        temperature=args.temperature if method_key != "greedy" else None,
+        top_p=args.top_p if method_key != "greedy" else None,
+        top_k=args.top_k if method_key != "greedy" else None,
         progress=True,
         heartbeat_every=10,
         write_full_records=write_full_records,
@@ -119,8 +133,19 @@ def main() -> None:
         model=model,
         method_impl=method,
     )
-
-    run_generation(config)
+    result = run_generation(config)
+    run_dir = os.path.join(args.out_dir, args.run_id) if args.run_id else args.out_dir
+    summary_path = os.path.join(run_dir, "summary.jsonl")
+    manifest_path = os.path.join(run_dir, "manifest.json")
+    question_set_path = os.path.join(run_dir, "question_set.json")
+    artifacts = [summary_path, manifest_path, question_set_path]
+    if write_full_records:
+        artifacts.append(os.path.join(run_dir, "full.jsonl"))
+    print(f"Run directory: {run_dir}")
+    print("Artifacts:")
+    for path in artifacts:
+        print(f"  - {path}")
+    return result
 
 
 if __name__ == "__main__":

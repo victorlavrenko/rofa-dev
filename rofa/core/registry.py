@@ -7,10 +7,10 @@ from typing import Callable, Dict, Protocol
 
 
 class Method(Protocol):
-    """Protocol for method implementations."""
+    """Protocol for method implementations used by the core runner."""
 
     def run_one(self, example, context):
-        """Run the method on a single example."""
+        """Run the method on a single example and return a summary record."""
 
 
 @dataclass(frozen=True)
@@ -35,10 +35,18 @@ class PaperSpec:
 
 
 _PAPERS: Dict[str, PaperSpec] = {}
+_METHOD_ALIASES: Dict[str, str] = {
+    "branches": "k_sample_ensemble",
+}
 
 
 def register_paper(spec: PaperSpec) -> PaperSpec:
-    """Register a paper and return the stored spec."""
+    """Register a paper and return the stored spec.
+
+    Papers should expose a ``PaperSpec`` containing explicit ``MethodSpec`` entries.
+    Use :func:`resolve_method_key` to keep backward-compatible aliases such as
+    ``branches`` mapped to the internal method name ``k_sample_ensemble``.
+    """
     if spec.paper_id in _PAPERS:
         raise ValueError(f"Paper '{spec.paper_id}' is already registered.")
     _PAPERS[spec.paper_id] = spec
@@ -46,7 +54,7 @@ def register_paper(spec: PaperSpec) -> PaperSpec:
 
 
 def get_paper(paper_id: str) -> PaperSpec:
-    """Fetch a registered paper spec."""
+    """Fetch a registered paper spec by paper_id."""
     if paper_id not in _PAPERS:
         raise KeyError(f"Paper '{paper_id}' is not registered.")
     return _PAPERS[paper_id]
@@ -55,3 +63,13 @@ def get_paper(paper_id: str) -> PaperSpec:
 def list_papers() -> Dict[str, PaperSpec]:
     """Return all registered paper specs."""
     return dict(_PAPERS)
+
+
+def resolve_method_key(method: str) -> str:
+    """Resolve backward-compatible method aliases to internal names."""
+    return _METHOD_ALIASES.get(method, method)
+
+
+def list_method_aliases() -> Dict[str, str]:
+    """Return the supported method aliases for CLI compatibility."""
+    return dict(_METHOD_ALIASES)
