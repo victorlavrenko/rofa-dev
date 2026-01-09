@@ -43,6 +43,58 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _maybe_create_question_set(args: argparse.Namespace) -> None:
+    if not args.create_question_set:
+        return
+    qs_path = args.question_set_out or args.question_set_path
+    if not qs_path:
+        raise ValueError("--create-question-set requires --question-set-out or --question-set.")
+    if os.path.exists(qs_path):
+        qs = load_question_set(qs_path)
+        print(f"Using existing question set at {qs_path} (qs_id={qs.qs_id})")
+    else:
+        qs = create_question_set(
+            {"dataset_name": args.dataset_name, "dataset_split": args.dataset_split},
+            {
+                "seed": args.seed,
+                "n": args.n,
+                "subjects": args.subjects,
+                "max_per_subject": args.n / args.subjects * 1.1 + 1,
+            },
+        )
+        save_question_set(qs, qs_path)
+        print(f"Saved question set to {qs_path} (qs_id={qs.qs_id})")
+    if not args.question_set_path:
+        args.question_set_path = qs_path
+
+
+def _resolve_method_key(args: argparse.Namespace, paper) -> str:
+    if not args.method:
+        raise ValueError("--method is required when running generation.")
+    method_key = resolve_method_key(args.method)
+    if method_key not in paper.methods:
+        aliases = list(list_method_aliases().keys())
+        raise ValueError(
+            f"--method must be one of {sorted(paper.methods.keys())} or aliases {aliases} "
+            f"for paper {paper.paper_id}."
+        )
+    return method_key
+
+
+def _build_method(method_key: str, args: argparse.Namespace):
+    if method_key == "greedy":
+        return GreedyDecode(), False
+    return (
+        BranchSamplingEnsemble(
+            n_branches=args.branches,
+            temperature=args.temperature,
+            top_p=args.top_p,
+            top_k=args.top_k,
+        ),
+        True,
+    )
+
+
 def main() -> None:
     """Run generation using a preselected paper/method configuration.
 
@@ -58,56 +110,16 @@ def main() -> None:
     paper = get_paper(args.paper)
     args.dataset_name = args.dataset_name or paper.default_dataset
     args.dataset_split = args.dataset_split or paper.default_split
-    if args.create_question_set:
-        qs_path = args.question_set_out or args.question_set_path
-        if not qs_path:
-            raise ValueError("--create-question-set requires --question-set-out or --question-set.")
-        if os.path.exists(qs_path):
-            qs = load_question_set(qs_path)
-            print(f"Using existing question set at {qs_path} (qs_id={qs.qs_id})")
-        else:
-            qs = create_question_set(
-                {"dataset_name": args.dataset_name, "dataset_split": args.dataset_split},
-                {
-                    "seed": args.seed,
-                    "n": args.n,
-                    "subjects": args.subjects,
-                    "max_per_subject": args.n / args.subjects * 1.1 + 1,
-                },
-            )
-            save_question_set(qs, qs_path)
-            print(f"Saved question set to {qs_path} (qs_id={qs.qs_id})")
-        if not args.method:
-            return
-        if not args.question_set_path:
-            args.question_set_path = qs_path
-
-    if not args.method:
-        raise ValueError("--method is required when running generation.")
-    method_key = resolve_method_key(args.method)
-    if method_key not in paper.methods:
-        aliases = list(list_method_aliases().keys())
-        raise ValueError(
-            f"--method must be one of {sorted(paper.methods.keys())} or aliases {aliases} "
-            f"for paper {paper.paper_id}."
-        )
+    _maybe_create_question_set(args)
+    if args.create_question_set and not args.method:
+        return
+    method_key = _resolve_method_key(args, paper)
     if not args.out_dir:
         raise ValueError("--out-dir is required when running generation.")
 
     tokenizer = load_tokenizer()
     model = load_model_with_fallback()
-
-    if method_key == "greedy":
-        method = GreedyDecode()
-        write_full_records = False
-    else:
-        method = BranchSamplingEnsemble(
-            n_branches=args.branches,
-            temperature=args.temperature,
-            top_p=args.top_p,
-            top_k=args.top_k,
-        )
-        write_full_records = True
+    method, write_full_records = _build_method(method_key, args)
 
     config = GenerationConfig(
         method=method_key,
