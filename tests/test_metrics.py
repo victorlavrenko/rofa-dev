@@ -1,6 +1,6 @@
 import math
 
-from rofa.metrics import _diversity_metrics, _entropy_from_counter, _safe_counter_preds
+from rofa.core.metrics import _diversity_metrics, _entropy_from_counter, _safe_counter_preds
 
 
 def test_diversity_metrics_unanimous():

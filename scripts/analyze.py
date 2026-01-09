@@ -7,7 +7,7 @@ import json
 import os
 from typing import Any, Dict, List
 
-from rofa.metrics import r_w_other_class, top2_coverage
+from rofa.core.metrics import r_w_other_class, top2_coverage
 
 
 def parse_args() -> argparse.Namespace:

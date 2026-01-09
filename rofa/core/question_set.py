@@ -82,7 +82,7 @@ def create_question_set(dataset_cfg: Dict[str, Any], selection_cfg: Dict[str, An
             {
                 "dataset_index": idx,
                 "id": ex.get("id"),
-        "question_hash": question_hash(ex),
+                "question_hash": question_hash(ex),
             }
         )
 
