@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Protocol
 
 from rofa.core.io import _now_utc
 from rofa.core.metrics import _correct_fraction, _diversity_metrics
 from rofa.core.model import MODEL_ID, infer_one
 from rofa.papers.from_answers_to_hypotheses.prompts import SYSTEM, build_user
+
+
+class MethodProtocol(Protocol):
+    """Protocol for paper method implementations."""
+
+    def run_one(self, example: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Run the method on a single example and return a summary record."""
 
 
 @dataclass
@@ -58,7 +65,7 @@ class GreedyDecode:
 
 @dataclass
 class BranchSamplingEnsemble:
-    """Ten-branch sampling ensemble."""
+    """Multi-sample (k-sample) ensemble with per-branch consensus metrics."""
 
     n_branches: int = 10
     temperature: float = 0.8

@@ -28,7 +28,18 @@ class QuestionSet:
 
 
 def load_filtered_dataset(dataset_name: str, split: str):
-    """Load and filter the dataset with the same criteria as the notebook."""
+    """Load and filter the dataset with the same criteria as the notebook.
+
+    Args:
+        dataset_name: Hugging Face dataset name.
+        split: Dataset split to load (e.g., ``validation``).
+
+    Returns:
+        A filtered datasets.Dataset object.
+
+    Raises:
+        ValueError: If the dataset cannot be loaded or filtering fails due to schema drift.
+    """
     ds = load_dataset(dataset_name, split=split)
     ds = ds.filter(
         lambda x: (
@@ -42,6 +53,7 @@ def load_filtered_dataset(dataset_name: str, split: str):
 
 
 def question_hash(example: Dict[str, Any]) -> str:
+    """Return a stable hash for the question/option fields."""
     payload = {
         "question": example.get("question"),
         "opa": example.get("opa"),
@@ -59,7 +71,25 @@ def _make_qs_id(payload: Dict[str, Any]) -> str:
 
 
 def create_question_set(dataset_cfg: Dict[str, Any], selection_cfg: Dict[str, Any]) -> QuestionSet:
-    """Create a deterministic question set."""
+    """Create a deterministic question set.
+
+    Args:
+        dataset_cfg: Dataset name and split configuration.
+        selection_cfg: Selection settings (seed, n, subjects, max_per_subject).
+
+    Returns:
+        A QuestionSet with deterministic ordering and metadata.
+
+    Artifacts:
+        None (use :func:`save_question_set` to persist to disk).
+
+    Raises:
+        ValueError: If the dataset schema has drifted or selection criteria are invalid.
+
+    Notes:
+        The selection protocol (filters + subject balancing) is stable across papers;
+        paper-specific analyses should treat the generated question set as a fixed input.
+    """
     dataset_name = dataset_cfg["dataset_name"]
     dataset_split = dataset_cfg["dataset_split"]
 
@@ -124,12 +154,31 @@ def create_question_set(dataset_cfg: Dict[str, Any], selection_cfg: Dict[str, An
 
 
 def save_question_set(qs: QuestionSet, path: str) -> None:
-    """Save a question set to disk."""
+    """Save a question set to disk.
+
+    Args:
+        qs: QuestionSet instance.
+        path: Destination file path for ``question_set.json``.
+
+    Artifacts:
+        Writes a JSON file at ``path``.
+    """
     _atomic_write_json(path, asdict(qs))
 
 
 def load_question_set(path: str) -> QuestionSet:
-    """Load a question set from disk."""
+    """Load a question set from disk.
+
+    Args:
+        path: Path to ``question_set.json``.
+
+    Returns:
+        A QuestionSet instance.
+
+    Raises:
+        FileNotFoundError: If the path does not exist.
+        ValueError: If the JSON payload is missing required keys.
+    """
     with open(path, "r", encoding="utf-8") as f:
         payload = json.load(f)
     return QuestionSet(**payload)

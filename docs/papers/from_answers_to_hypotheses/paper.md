@@ -16,6 +16,17 @@ Recent advances in large language models (LLMs) have demonstrated expert-level p
 
 ---
 
+## Reproducibility resources
+
+- **Reproduction notebook**: `notebooks/20_paper_reproduce.ipynb`
+- **Metric implementations**:
+  - Paper tables: `rofa/papers/from_answers_to_hypotheses/analysis.py`
+  - Core consensus utilities: `rofa/core/metrics.py`
+- **Question selection protocol**: v1 (subject-balanced MedMCQA selection with filters and hashes
+  defined in `rofa/core/question_set.py` and stored in `question_set.json`).
+
+---
+
 ## 1. Introduction: the illusion of “confidently wrong” AI
 
 Large language models have rapidly achieved impressive results on medical examinations and diagnostic benchmarks, in some cases matching or exceeding average physician performance on structured tasks (Singhal et al., 2025; Gu et al., 2025). At the same time, randomized clinical trials suggest that simply giving physicians access to an LLM does not reliably improve diagnostic accuracy (Goh et al., 2024). This tension has reinforced a widespread belief that LLMs are unsafe for medicine because they “hallucinate” answers with unjustified confidence.

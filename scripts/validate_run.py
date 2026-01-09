@@ -5,21 +5,27 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from typing import Any, Dict, List
+import tempfile
+from typing import Any, Dict, List, Tuple
+
+from rofa.core.io import unpack_zip
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for run validation."""
     parser = argparse.ArgumentParser(description="Validate ROFA run artifacts.")
-    parser.add_argument("--run-dir", required=True, help="Path to a run directory.")
+    parser.add_argument("--run", required=True, help="Path to a run directory or zip.")
     return parser.parse_args()
 
 
 def _load_json(path: str) -> Dict[str, Any]:
+    """Load a JSON file."""
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def _load_jsonl(path: str) -> List[Dict[str, Any]]:
+    """Load a JSONL file with line-level error reporting."""
     records: List[Dict[str, Any]] = []
     with open(path, "r", encoding="utf-8") as f:
         for line_number, line in enumerate(f, 1):
@@ -34,21 +40,39 @@ def _load_jsonl(path: str) -> List[Dict[str, Any]]:
 
 
 def _require_keys(record: Dict[str, Any], keys: List[str], context: str) -> List[str]:
+    """Return list of missing key errors for a record."""
     missing = [key for key in keys if key not in record]
     if missing:
         return [f"{context}: missing {', '.join(missing)}"]
     return []
 
 
+def _resolve_run_dir(run_path: str) -> Tuple[str, bool]:
+    if os.path.isdir(run_path):
+        return os.path.abspath(run_path), False
+    if run_path.endswith(".zip") and os.path.isfile(run_path):
+        tmp_dir = tempfile.mkdtemp(prefix="rofa_run_")
+        unpack_zip(run_path, tmp_dir)
+        return tmp_dir, True
+    raise ValueError(f"Run directory or zip not found: {run_path}")
+
+
 def main() -> None:
+    """Validate required run artifacts and summary schema.
+
+    Outputs:
+        Prints a human-readable summary on success.
+
+    Failure modes:
+        Raises SystemExit with a list of missing files/columns on validation errors.
+    """
     args = parse_args()
-    run_dir = os.path.abspath(args.run_dir)
-    if not os.path.isdir(run_dir):
-        raise ValueError(f"Run directory not found: {run_dir}")
+    run_dir, _ = _resolve_run_dir(args.run)
 
     manifest_path = os.path.join(run_dir, "manifest.json")
     summary_path = os.path.join(run_dir, "summary.jsonl")
     progress_path = os.path.join(run_dir, "progress.json")
+    question_set_path = os.path.join(run_dir, "question_set.json")
 
     errors: List[str] = []
 
@@ -71,7 +95,9 @@ def main() -> None:
 
     if os.path.exists(progress_path):
         progress = _load_json(progress_path)
-        errors.extend(_require_keys(progress, ["run_id", "i", "picked", "summary_written"], "progress"))
+        errors.extend(
+            _require_keys(progress, ["run_id", "position", "summary_written", "full_written"], "progress")
+        )
         summary_written = progress.get("summary_written")
         if isinstance(summary_written, int) and summary_written != len(summary_records):
             errors.append(
@@ -81,9 +107,12 @@ def main() -> None:
         progress = {}
         summary_written = None
 
+    if not os.path.exists(question_set_path):
+        errors.append("question_set.json is missing.")
+
     if method is None and summary_records:
         sample = summary_records[0]
-        method = "branches" if "branch_preds" in sample else "greedy"
+        method = "k_sample_ensemble" if "branch_preds" in sample else "greedy"
 
     for idx, record in enumerate(summary_records):
         errors.extend(_require_keys(record, ["index", "id", "gold", "subject_name", "timestamp"], f"summary[{idx}]"))
@@ -91,7 +120,7 @@ def main() -> None:
             errors.extend(
                 _require_keys(record, ["prediction", "is_correct", "model_output"], f"summary[{idx}]")
             )
-        elif method == "branches":
+        elif method in {"k_sample_ensemble", "branches"}:
             errors.extend(
                 _require_keys(record, ["branch_preds", "leader", "max_frac", "valid_n"], f"summary[{idx}]")
             )

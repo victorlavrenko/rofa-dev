@@ -22,6 +22,7 @@ from .schemas import GenerationConfig, RunConfig, RunManifest
 
 
 def _resolve_example(ds, entry: Dict[str, Any], id_index_cache: Dict[str, int]) -> Dict[str, Any]:
+    """Resolve a question set entry to a dataset example."""
     dataset_index = entry.get("dataset_index")
     if dataset_index is not None and 0 <= dataset_index < len(ds):
         return ds[dataset_index]
@@ -49,6 +50,7 @@ def _update_progress_bar(
     start_time: float,
     heartbeat: Optional[str] = None,
 ) -> None:
+    """Update the tqdm progress bar with elapsed time and ETA."""
     elapsed = time.time() - start_time
     avg = elapsed / max(1, completed)
     remaining = max(0.0, (total - completed) * avg)
@@ -65,7 +67,29 @@ def _update_progress_bar(
 
 
 def run_generation(config: GenerationConfig) -> Dict[str, Any]:
-    """Run a generation job based on a question set."""
+    """Run a generation job based on a question set.
+
+    Args:
+        config: GenerationConfig containing model handles, method implementation, and
+            output locations.
+
+    Returns:
+        Summary information for the completed run segment.
+
+    Artifacts:
+        Writes ``manifest.json``, ``question_set.json``, ``progress.json``, and
+        ``summary.jsonl`` to the run directory. Writes ``full.jsonl`` for ensemble runs
+        when ``write_full_records=True``.
+
+    Raises:
+        ValueError: If required model components are missing, if resume state is
+            inconsistent with on-disk artifacts, or if the question set mismatches the
+            run directory.
+
+    Notes:
+        The run artifact schema is stable across papers. Paper-specific logic lives in
+        ``config.method_impl`` (e.g., prompts or decoding strategy).
+    """
     if config.tokenizer is None or config.model is None or config.method_impl is None:
         raise ValueError("GenerationConfig must include tokenizer, model, and method_impl.")
     if config.run_id:

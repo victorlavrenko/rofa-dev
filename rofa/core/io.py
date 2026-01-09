@@ -42,18 +42,38 @@ def _atomic_write_json(path: str, payload: Dict[str, Any]) -> None:
 
 
 def write_manifest(path: str, manifest: RunManifest) -> None:
-    """Write the run manifest to disk."""
+    """Write the run manifest to disk.
+
+    Args:
+        path: Destination path for ``manifest.json``.
+        manifest: RunManifest payload.
+
+    Artifacts:
+        Writes a JSON manifest file containing stable run metadata.
+    """
     payload = asdict(manifest)
     _atomic_write_json(path, payload)
 
 
 def write_progress(path: str, payload: Dict[str, Any]) -> None:
-    """Persist progress metadata for resume support."""
+    """Persist progress metadata for resume support.
+
+    Args:
+        path: Destination path for ``progress.json``.
+        payload: Progress metadata including ``run_id`` and record counters.
+
+    Artifacts:
+        Writes a JSON progress file used for resume logic.
+    """
     _atomic_write_json(path, payload)
 
 
 def load_progress(path: str) -> Optional[Dict[str, Any]]:
-    """Load progress metadata if it exists."""
+    """Load progress metadata if it exists.
+
+    Returns:
+        The progress payload or None if ``path`` does not exist.
+    """
     if not os.path.exists(path):
         return None
     with open(path, "r", encoding="utf-8") as f:
@@ -61,7 +81,18 @@ def load_progress(path: str) -> Optional[Dict[str, Any]]:
 
 
 def download(url: str, dest: str) -> str:
-    """Download a file from a URL to the destination path."""
+    """Download a file from a URL to the destination path.
+
+    Args:
+        url: Remote URL to fetch.
+        dest: Local destination path.
+
+    Returns:
+        The destination path after writing.
+
+    Raises:
+        URLError: If the request fails or the remote file is unavailable.
+    """
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     with urllib.request.urlopen(url) as response, open(dest, "wb") as f:
         shutil.copyfileobj(response, f)

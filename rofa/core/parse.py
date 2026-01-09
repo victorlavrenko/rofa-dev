@@ -32,6 +32,16 @@ class ExtractDebug:
     scores: Dict[str, int]
 
 
+@dataclass(frozen=True)
+class ParseDebug:
+    """Structured debug payload for answer extraction."""
+
+    letter: Optional[str]
+    scores: Dict[str, int]
+    method: str
+    matched_option: Optional[str] = None
+
+
 def _extract_impl(text: str, *, return_debug: bool = False) -> Tuple[Optional[str], Optional[ExtractDebug]]:
     """Return the extracted letter and optional debug metadata."""
     if not text:
@@ -143,7 +153,22 @@ def extract_choice_letter(
     text: str,
     options: Mapping[str, str] | Sequence[str] | None = None,
 ) -> Optional[str]:
-    """Extract a single answer choice letter from model output."""
+    """Extract a single answer choice letter from model output.
+
+    Args:
+        text: Model output text.
+        options: Optional mapping or list of options for fallback matching.
+
+    Returns:
+        The extracted letter (A/B/C/D) or None.
+
+    Failure modes:
+        Returns None if no letter can be inferred, or if output is empty/ambiguous.
+
+    Stability:
+        This parser is part of the stable core protocol; papers should avoid modifying
+        its heuristics without documenting a protocol change.
+    """
     letter, _ = _extract_impl(text, return_debug=False)
     if letter is not None or not options:
         return letter
@@ -156,18 +181,30 @@ def extract_choice_letter(
 def extract_choice_letter_debug(
     text: str,
     options: Mapping[str, str] | Sequence[str] | None = None,
-) -> Tuple[Optional[str], Dict[str, int], str]:
-    """Return the extracted letter, score map, and strategy name."""
+) -> ParseDebug:
+    """Return structured debug metadata for answer extraction.
+
+    Args:
+        text: Model output text.
+        options: Optional mapping or list of options for fallback matching.
+
+    Returns:
+        ParseDebug containing the extracted letter, scoring, and method name.
+
+    Failure modes:
+        ``method`` may be ``unknown`` if no heuristic fires; ``letter`` may be None if
+        no extraction is possible.
+    """
     letter, dbg = _extract_impl(text, return_debug=True)
     if letter is None and options:
         option_map = _coerce_options(options)
         matched = _match_option_text(text, option_map) if option_map else None
         if matched is not None:
             scores = dbg.scores if dbg else {}
-            return matched, scores, "option-text"
+            return ParseDebug(letter=matched, scores=scores, method="option-text", matched_option=matched)
     if dbg is None:
-        return letter, {}, "unknown"
-    return letter, dbg.scores, dbg.method
+        return ParseDebug(letter=letter, scores={}, method="unknown")
+    return ParseDebug(letter=letter, scores=dbg.scores, method=dbg.method)
 
 
 def cop_to_letter(cop: int):
