@@ -78,7 +78,7 @@ We measure **Top‑2 coverage**:
 \text{Top‑2 coverage} = \frac{1}{N}\sum_i \mathbb{1}{y_i \in \text{Top‑2}(P_i)}
 ]
 
-Observed Top-2 coverage is **80.5%**, compared to a greedy accuracy of **65.75%**, corresponding to an absolute improvement of **14.75 percentage points**. Under a binomial model with the null hypothesis H₀: p = 0.6575, this difference is highly statistically significant (p ≪ 10⁻⁶).
+Observed Top-2 coverage is **80.5%**, compared to a greedy accuracy of **65.75%**, corresponding to an absolute improvement of **14.75 percentage points**. Under a binomial model with null hypothesis H₀: π = 0.6575, this difference is highly statistically significant (p-value ≪ 10⁻⁶).
 
 **Relation to prior work.** This result is consistent with Kadavath et al. (2022), who show that models frequently possess internal signals of uncertainty. Our findings extend this by demonstrating that uncertainty manifests as *explicit alternative hypotheses*, not merely as reduced confidence.
 
@@ -101,7 +101,12 @@ Testing against a conservative reliability threshold of 95% yields (p < 0.01), a
 
 ## 6. Distributional Analysis of Consensus
 
-Figure 1 (not shown here) plots the empirical distribution of (\text{max_frac}). Accuracy increases monotonically with agreement but saturates well below perfect reliability. Near‑unanimous cases ((\text{max_frac} \ge 0.9)) still exhibit error rates above 15%.
+Figure 1 plots the empirical distribution of (\text{max_frac}). Accuracy increases monotonically with agreement but saturates well below perfect reliability. Near‑unanimous cases ((\text{max_frac} \ge 0.9)) still exhibit error rates above 15%.
+
+<img src="figure1_max_frac_exact.png" alt="Figure 1" width="45%">
+
+*Figure 1: Accuracy as a function of internal consensus (max_frac_exact). Accuracy increases monotonically with agreement but saturates well below perfect reliability.*
+
 
 This behavior is inconsistent with the assumption that confidence or agreement can serve as a sufficient decision criterion.
 
