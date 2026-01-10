@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from collections import Counter
 from typing import Dict, List, Optional, Sequence, Tuple, cast
 
 import pandas as pd
@@ -150,6 +151,48 @@ def top2_coverage(df_branches: pd.DataFrame) -> float:
     )
     total = len(df_branches)
     return hits / total if total else 0.0
+
+
+def compute_max_frac_exact(branch_preds: Sequence[Optional[str]]) -> float:
+    """Compute max_frac_exact using full branch count as denominator."""
+    total = len(branch_preds)
+    if total == 0:
+        return 0.0
+    valid = [
+        pred
+        for pred in branch_preds
+        if isinstance(pred, str) and pred.strip() and not pd.isna(pred)
+    ]
+    if not valid:
+        return 0.0
+    counts = Counter(valid)
+    max_count = max(counts.values()) if counts else 0
+    return max_count / total
+
+
+def accuracy_by_max_frac_exact(df_branches: pd.DataFrame) -> pd.DataFrame:
+    """Compute accuracy grouped by exact max_frac_exact values."""
+    if "branch_preds" not in df_branches.columns:
+        raise ValueError("DataFrame does not contain branch_preds.")
+    if "leader_correct" in df_branches.columns:
+        leader_correct = cast(pd.Series, df_branches["leader_correct"]).fillna(False).astype(bool)
+    elif {"leader", "gold"}.issubset(df_branches.columns):
+        leader = cast(pd.Series, df_branches["leader"])
+        gold = cast(pd.Series, df_branches["gold"])
+        leader_correct = (leader == gold).fillna(False).astype(bool)
+    else:
+        raise ValueError("DataFrame does not contain leader_correct or leader/gold.")
+
+    max_frac_exact = cast(pd.Series, df_branches["branch_preds"]).apply(compute_max_frac_exact)
+    grouped = (
+        pd.DataFrame({"max_frac_exact": max_frac_exact, "leader_correct": leader_correct})
+        .groupby("max_frac_exact")
+        .agg(count=("leader_correct", "size"), accuracy=("leader_correct", "mean"))
+        .reset_index()
+        .sort_values("max_frac_exact")
+    )
+    grouped["error_rate"] = 1.0 - grouped["accuracy"]
+    return cast(pd.DataFrame, grouped)
 
 
 def max_frac_distribution(
