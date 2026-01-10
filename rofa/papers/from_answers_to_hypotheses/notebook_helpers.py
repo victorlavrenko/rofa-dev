@@ -88,7 +88,9 @@ def plot_accuracy_vs_consensus(
 
 def majority_vote_table(df_greedy: pd.DataFrame, df_branches: pd.DataFrame) -> pd.DataFrame:
     merge_keys = [
-        key for key in ["id", "index", "question"] if key in df_greedy.columns and key in df_branches.columns
+        key
+        for key in ["id", "index", "question"]
+        if key in df_greedy.columns and key in df_branches.columns
     ]
     if not merge_keys:
         raise ValueError("No shared keys available to merge greedy and k-sample runs.")
@@ -127,12 +129,16 @@ def export_paper_reports(
     df_subject_breakdown: pd.DataFrame,
 ) -> Path:
     report_dir = _resolve_report_dir(metadata)
+
+    def _cell_to_float(df: pd.DataFrame, column: str) -> float:
+        return float(df.at[df.index[0], column])
+
     paper_report = {
-        "greedy_accuracy": float(df_greedy_accuracy["value"][0]),
-        "leader_accuracy": float(df_leader_accuracy["value"][0]),
+        "greedy_accuracy": _cell_to_float(df_greedy_accuracy, "value"),
+        "leader_accuracy": _cell_to_float(df_leader_accuracy, "value"),
         "unanimous": unanimous_stats,
         "near_unanimous": near_unanimous_stats,
-        "top2_coverage": float(df_top2["value"][0]),
+        "top2_coverage": _cell_to_float(df_top2, "value"),
     }
     report_path = report_dir / "paper_report.json"
     with report_path.open("w", encoding="utf-8") as handle:
