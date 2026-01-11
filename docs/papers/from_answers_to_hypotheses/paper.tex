@@ -264,6 +264,20 @@ These results suggest that safe deployment of LLMs in medicine requires decision
   \item interfaces that expose structured uncertainty to clinicians.
 \end{itemize}
 
+\section*{Reproducibility and Code Availability}
+
+All experiments reported in this paper are fully reproducible.
+We release a public, versioned snapshot of the complete codebase at
+\url{https://github.com/victorlavrenko/rofa/releases/tag/paper/from-answers-to-hypotheses-v1}.
+
+A dedicated reproduction notebook,
+\texttt{notebooks/20\_paper\_reproduce.ipynb},
+reproduces all reported figures and statistical analyses using the released
+model outputs, without requiring rerunning model generation.
+For full end-to-end reproduction, including stochastic model generation,
+the generation notebook \texttt{notebooks/10\_colab\_generate.ipynb}
+can be executed prior to the reproduction notebook.
+
 \printbibliography[]
 
 \end{document}

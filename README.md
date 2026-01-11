@@ -196,7 +196,8 @@ See `docs/REPRODUCIBILITY.md` for details.
 ## Reproduce paper results
 
 - Notebook: `notebooks/20_paper_reproduce.ipynb`
-- Paper doc: `docs/papers/from_answers_to_hypotheses/paper.md`
+- Paper source: `docs/papers/from_answers_to_hypotheses/paper.tex`
+- Paper PDF: `docs/papers/from_answers_to_hypotheses/paper.pdf`
 
 ## Non-Python quickstart (Colab + download)
 
