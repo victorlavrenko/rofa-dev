@@ -25,7 +25,7 @@ def load_summary(run_dir: str) -> pd.DataFrame:
     return pd.read_json(summary_path, lines=True)
 
 
-def _resolve_run_dir(run_dir_or_zip: str) -> Tuple[str, bool]:
+def resolve_run_dir(run_dir_or_zip: str) -> Tuple[str, bool]:
     if os.path.isdir(run_dir_or_zip):
         return run_dir_or_zip, False
     if run_dir_or_zip.endswith(".zip") and os.path.isfile(run_dir_or_zip):
@@ -56,7 +56,7 @@ def load_paper_runs(
     temp_paths: List[str] = []
 
     for run_dir_or_zip in run_dirs_or_zips:
-        run_dir, is_temp = _resolve_run_dir(run_dir_or_zip)
+        run_dir, is_temp = resolve_run_dir(run_dir_or_zip)
         if is_temp:
             temp_paths.append(run_dir)
 
@@ -244,6 +244,52 @@ def paper_metrics(df_summary: pd.DataFrame) -> Dict[str, object]:
         metrics["near_unanimous"] = near_unanimous_stats(df_summary)
         metrics["top2_coverage"] = top2_coverage(df_summary)
     return metrics
+
+
+def run_report(df_summary: pd.DataFrame) -> Dict[str, object]:
+    """Compute a JSON-ready report from a summary DataFrame."""
+    total = len(df_summary)
+    report: Dict[str, object] = {"total": total}
+    if total == 0:
+        return report
+
+    if "prediction" in df_summary.columns or "is_correct" in df_summary.columns:
+        report["greedy_accuracy"] = accuracy_greedy(df_summary)
+        return report
+
+    if "leader_correct" not in df_summary.columns:
+        raise ValueError("DataFrame does not contain leader_correct.")
+    if "max_frac" not in df_summary.columns:
+        raise ValueError("DataFrame does not contain max_frac.")
+    if "branch_preds" not in df_summary.columns or "gold" not in df_summary.columns:
+        raise ValueError("DataFrame does not contain branch_preds/gold.")
+
+    report["leader_accuracy"] = accuracy_leader(df_summary)
+    report["unanimous"] = unanimous_stats(df_summary)
+    report["near_unanimous"] = near_unanimous_stats(df_summary)
+
+    branch_preds = cast(pd.Series, df_summary["branch_preds"])
+    gold_series = cast(pd.Series, df_summary["gold"])
+    top2_hits = sum(
+        1
+        for preds, gold in zip(branch_preds, gold_series, strict=False)
+        if isinstance(gold, str) and metrics_top2_coverage(preds, gold)
+    )
+    report["top2_coverage"] = {
+        "count": top2_hits,
+        "rate": top2_hits / total if total else 0.0,
+    }
+
+    max_frac = cast(pd.Series, df_summary["max_frac"])
+    leader_correct = cast(pd.Series, df_summary["leader_correct"])
+    r_w_other_counts = {"R": 0, "W": 0, "Other": 0}
+    for mf, lc in zip(max_frac, leader_correct, strict=False):
+        lc_value = None if pd.isna(lc) else bool(lc)
+        mf_value = float(mf) if pd.notna(mf) else float("nan")
+        label = r_w_other_class(mf_value, lc_value)
+        r_w_other_counts[label] += 1
+    report["r_w_other"] = r_w_other_counts
+    return report
 
 
 def unanimous_wrong(df_branches: pd.DataFrame) -> pd.DataFrame:
