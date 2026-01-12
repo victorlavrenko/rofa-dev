@@ -88,7 +88,7 @@ ROFA is an exploration tool, not yet a product.
    - Logs are written incrementally and safely
 
 2. **Analyze logs** (local, CPU)
-   - Run `scripts/analyze.py` or `notebooks/from_answers_to_hypotheses/20_paper_reproduce.ipynb`
+   - Run `scripts/analyze.py` or `notebooks/<paper_slug>/20_paper_reproduce.ipynb`
    - No model access required
 
 3. **Publish results**
@@ -100,4 +100,4 @@ See `docs/REPRODUCIBILITY.md` for details.
 
 ## Reproduce paper results
 
-- `from_answers_to_hypotheses`: `docs/papers/from_answers_to_hypotheses/README.md`
+- [`from_answers_to_hypotheses`](docs/papers/from_answers_to_hypotheses/README.md)
