@@ -7,7 +7,7 @@ import time
 import uuid
 from typing import Any, Dict, Optional
 
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from .io import _append_jsonl, _now_utc, load_progress, write_manifest, write_progress
 from .parse import cop_to_letter

@@ -19,9 +19,9 @@ def _download_and_unpack(asset_url: str) -> str:
     filename = Path(urlparse(asset_url).path).name or "run.zip"
     zip_path = runs_root / filename
     download(asset_url, str(zip_path))
-    run_dir = runs_root / zip_path.stem
+    run_dir = runs_root
     unpack_zip(str(zip_path), str(run_dir))
-    return str(run_dir)
+    return str(run_dir / zip_path.stem)
 
 
 def resolve_run_input(run_dir: str, asset_url: str) -> str:
@@ -112,7 +112,7 @@ def _resolve_report_dir(metadata: Dict[str, Any]) -> Path:
     if run_path is None:
         raise ValueError("No run path found in metadata.")
     run_id = Path(run_path).name
-    report_dir = Path("notebooks") / "reports" / run_id
+    report_dir = Path("reports") / run_id
     report_dir.mkdir(parents=True, exist_ok=True)
     return report_dir
 
