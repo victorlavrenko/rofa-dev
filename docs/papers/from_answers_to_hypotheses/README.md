@@ -6,10 +6,10 @@
 baseline paper captured in this repository. It analyzes multi-branch sampling and consensus behavior for
 clinical QA prompts, contrasting greedy decoding with a 10-branch ensemble.
 
-- Paper package: `rofa/papers/from_answers_to_hypotheses/`
-- Paper manuscript: `docs/papers/from_answers_to_hypotheses/paper.md`
-- Paper source: `docs/papers/from_answers_to_hypotheses/paper.tex`
-- Paper PDF: `docs/papers/from_answers_to_hypotheses/paper.pdf`
+- Paper package: [`rofa/papers/from_answers_to_hypotheses/`](../../../rofa/papers/from_answers_to_hypotheses/)
+- Paper manuscript: [`docs/papers/from_answers_to_hypotheses/paper.md`](paper.md)
+- Paper source: [`docs/papers/from_answers_to_hypotheses/paper.tex`](paper.tex)
+- Paper PDF: [`docs/papers/from_answers_to_hypotheses/paper.pdf`](paper.pdf)
 
 ## Scope of the baseline paper
 
@@ -106,5 +106,5 @@ These metrics are intentionally simple but expose **structural failure modes** t
 
 ### Paper artifacts
 
-- Paper source: `docs/papers/from_answers_to_hypotheses/paper.tex`
-- Paper PDF: `docs/papers/from_answers_to_hypotheses/paper.pdf`
+- Paper source: [`docs/papers/from_answers_to_hypotheses/paper.tex`](paper.tex)
+- Paper PDF: [`docs/papers/from_answers_to_hypotheses/paper.pdf`](paper.pdf)
