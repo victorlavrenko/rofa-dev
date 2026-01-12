@@ -38,7 +38,7 @@ paper-specific methods, prompts, and analyses under `rofa/papers/<paper_id>/`.
 - **Core toolkit**: `rofa/core/` (dataset selection, parsing, metrics, run I/O)
 - **Paper packages**: `rofa/papers/<paper_slug>/` (prompts, methods, paper analysis glue)
 - **Paper docs**: `docs/papers/<paper_slug>/`
-- **Notebooks**: `notebooks/` (generation + reproduction)
+- **Notebooks**: `notebooks/<paper_slug>/` (generation + reproduction)
 
 ### Choose your paper
 
@@ -183,7 +183,7 @@ ROFA is an exploration tool, not a product.
    - Logs are written incrementally and safely
 
 2. **Analyze logs** (local, CPU)
-   - Run `scripts/analyze.py` or `notebooks/20_paper_reproduce.ipynb`
+   - Run `scripts/analyze.py` or `notebooks/from_answers_to_hypotheses/20_paper_reproduce.ipynb`
    - No model access required
 
 3. **Publish results**
@@ -195,16 +195,16 @@ See `docs/REPRODUCIBILITY.md` for details.
 
 ## Reproduce paper results
 
-- Notebook: `notebooks/20_paper_reproduce.ipynb`
+- Notebook: `notebooks/from_answers_to_hypotheses/20_paper_reproduce.ipynb`
 - Paper source: `docs/papers/from_answers_to_hypotheses/paper.tex`
 - Paper PDF: `docs/papers/from_answers_to_hypotheses/paper.pdf`
 
 ## Non-Python quickstart (Colab + download)
 
-1. Open `notebooks/10_colab_generate.ipynb` in Colab and run the bootstrap cell.
+1. Open `notebooks/from_answers_to_hypotheses/10_colab_generate.ipynb` in Colab and run the bootstrap cell.
 2. Run the greedy and k-sample ensemble cells (two runs; same question set).
 3. Download the run folders as zip files.
-4. Open `notebooks/20_paper_reproduce.ipynb`, paste local paths or zip paths, and run.
+4. Open `notebooks/from_answers_to_hypotheses/20_paper_reproduce.ipynb`, paste local paths or zip paths, and run.
 
 ---
 
@@ -212,15 +212,15 @@ See `docs/REPRODUCIBILITY.md` for details.
 
 ### Run Greedy and k-sample ensemble on Colab
 
-1. Open `notebooks/10_colab_generate.ipynb` or launch it in Colab:
-   - https://colab.research.google.com/github/victorlavrenko/rofa/blob/main/notebooks/10_colab_generate.ipynb
+1. Open `notebooks/from_answers_to_hypotheses/10_colab_generate.ipynb` or launch it in Colab:
+   - https://colab.research.google.com/github/victorlavrenko/rofa/blob/main/notebooks/from_answers_to_hypotheses/10_colab_generate.ipynb
 2. Update `N`, `SEED`, or `OUT_BASE` if desired.
 3. Run all cells. Outputs are written directly to Google Drive.
 
 ### Reproduce paper figures
 
-1. Open `notebooks/20_paper_reproduce.ipynb` or launch it in Colab:
-   - https://colab.research.google.com/github/victorlavrenko/rofa/blob/main/notebooks/20_paper_reproduce.ipynb
+1. Open `notebooks/from_answers_to_hypotheses/20_paper_reproduce.ipynb` or launch it in Colab:
+   - https://colab.research.google.com/github/victorlavrenko/rofa/blob/main/notebooks/from_answers_to_hypotheses/20_paper_reproduce.ipynb
 2. Provide a local run folder or a Release asset URL.
 3. Run the analysis cells and export reports.
 
