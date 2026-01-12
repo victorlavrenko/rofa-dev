@@ -30,12 +30,12 @@ This allows us to study phenomena that are invisible in standard greedy decoding
 
 ## Papers and experiments
 
-ROFA is organized **by paper**, with shared infrastructure under `rofa/core/` and
-paper-specific methods, prompts, and analyses under `rofa/papers/<paper_id>/`.
+ROFA is organized **by paper**, with shared infrastructure under [`rofa/core/`](rofa/core/) and
+paper-specific methods, prompts, and analyses under [`rofa/papers/<paper_id>/`](rofa/papers/).
 
 ### Multi-paper architecture (umbrella repo)
 
-- **Core toolkit**: `rofa/core/` (dataset selection, parsing, metrics, run I/O)
+- **Core toolkit**: [`rofa/core/`](rofa/core/) (dataset selection, parsing, metrics, run I/O)
 - **Paper packages**: `rofa/papers/<paper_slug>/` (prompts, methods, paper analysis glue)
 - **Paper docs**: `docs/papers/<paper_slug>/`
 - **Notebooks**: `notebooks/<paper_slug>/` (generation + reproduction)
@@ -43,7 +43,7 @@ paper-specific methods, prompts, and analyses under `rofa/papers/<paper_id>/`.
 ### Choose your paper
 
 - `from_answers_to_hypotheses`
-  - Paper package: `rofa/papers/from_answers_to_hypotheses/`
+  - Paper package: [`rofa/papers/from_answers_to_hypotheses/`](rofa/papers/from_answers_to_hypotheses/)
   - Paper documentation: [`docs/papers/from_answers_to_hypotheses/README.md`](docs/papers/from_answers_to_hypotheses/README.md)
 
 ## Repository philosophy
@@ -84,11 +84,11 @@ ROFA is an exploration tool, not yet a product.
 ## How to use this repository (high level)
 
 1. **Generate logs** (GPU / Colab)
-   - Run `scripts/generate.py` or the Colab notebooks
+   - Run [`scripts/generate.py`](scripts/generate.py) or the Colab notebooks
    - Logs are written incrementally and safely
 
 2. **Analyze logs** (local, CPU)
-   - Run `scripts/analyze.py` or `notebooks/<paper_slug>/20_paper_reproduce.ipynb`
+   - Run [`scripts/analyze.py`](scripts/analyze.py) or `notebooks/<paper_slug>/20_paper_reproduce.ipynb`
    - No model access required
 
 3. **Publish results**

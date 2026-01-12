@@ -1,7 +1,7 @@
 # ROFA Data Format
 
-This document describes the run artifact layout produced by `scripts/generate.py` and
-`rofa/core/runner.py`. Field names match `rofa/core/schemas.py`.
+This document describes the run artifact layout produced by [`scripts/generate.py`](../scripts/generate.py) and
+[`rofa/core/runner.py`](../rofa/core/runner.py). Field names match [`rofa/core/schemas.py`](../rofa/core/schemas.py).
 
 ## Run directory structure
 
