@@ -24,7 +24,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def _default_report_path(run_id: str) -> str:
-    reports_root = os.path.join("notebooks", "reports", run_id)
+    reports_root = os.path.join("notebooks", "from_answers_to_hypotheses", "reports", run_id)
     os.makedirs(reports_root, exist_ok=True)
     return os.path.join(reports_root, "report.json")
 
@@ -33,7 +33,7 @@ def main() -> None:
     """Generate analysis reports for one or more runs.
 
     Outputs:
-        Writes ``report.json`` under ``notebooks/reports/<run_id>/`` by default.
+        Writes ``report.json`` under ``notebooks/from_answers_to_hypotheses/reports/<run_id>/`` by default.
 
     Failure modes:
         Raises FileNotFoundError if the run directory or summary log is missing.
