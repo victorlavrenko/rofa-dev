@@ -97,6 +97,14 @@ These metrics are intentionally simple but expose **structural failure modes** t
 
 ## Reproduce paper results
 
-- Notebook: `notebooks/from_answers_to_hypotheses/20_paper_reproduce.ipynb`
+### Notebooks
+
+| Purpose | Local notebook | Colab notebook |
+| --- | --- | --- |
+| Generate runs (GPU) | [`notebooks/from_answers_to_hypotheses/10_colab_generate.ipynb`](../../../notebooks/from_answers_to_hypotheses/10_colab_generate.ipynb) | [Open in Colab](https://colab.research.google.com/github/rofa/rofa/blob/main/notebooks/from_answers_to_hypotheses/10_colab_generate.ipynb) |
+| Reproduce metrics (CPU) | [`notebooks/from_answers_to_hypotheses/20_paper_reproduce.ipynb`](../../../notebooks/from_answers_to_hypotheses/20_paper_reproduce.ipynb) | [Open in Colab](https://colab.research.google.com/github/rofa/rofa/blob/main/notebooks/from_answers_to_hypotheses/20_paper_reproduce.ipynb) |
+
+### Paper artifacts
+
 - Paper source: `docs/papers/from_answers_to_hypotheses/paper.tex`
 - Paper PDF: `docs/papers/from_answers_to_hypotheses/paper.pdf`
