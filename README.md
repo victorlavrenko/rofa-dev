@@ -36,9 +36,9 @@ paper-specific methods, prompts, and analyses under [`rofa/papers/<paper_id>/`](
 ### Multi-paper architecture (umbrella repo)
 
 - **Core toolkit**: [`rofa/core/`](rofa/core/) (dataset selection, parsing, metrics, run I/O)
-- **Paper packages**: `rofa/papers/<paper_slug>/` (prompts, methods, paper analysis glue)
-- **Paper docs**: `docs/papers/<paper_slug>/`
-- **Notebooks**: `notebooks/<paper_slug>/` (generation + reproduction)
+- **Paper packages**: [`rofa/papers/<paper_slug>/`](rofa/papers/) (prompts, methods, paper analysis glue)
+- **Paper docs**: [`docs/papers/<paper_slug>/`](docs/papers/)
+- **Notebooks**: [`notebooks/<paper_slug>/`](notebooks/) (generation + reproduction)
 
 ### Choose your paper
 
@@ -88,7 +88,7 @@ ROFA is an exploration tool, not yet a product.
    - Logs are written incrementally and safely
 
 2. **Analyze logs** (local, CPU)
-   - Run [`scripts/analyze.py`](scripts/analyze.py) or `notebooks/<paper_slug>/20_paper_reproduce.ipynb`
+   - Run [`scripts/analyze.py`](scripts/analyze.py) or [`notebooks/<paper_slug>/20_paper_reproduce.ipynb`](notebooks/)
    - No model access required
 
 3. **Publish results**
