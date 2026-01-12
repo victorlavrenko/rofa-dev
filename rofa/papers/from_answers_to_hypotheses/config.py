@@ -7,7 +7,7 @@ from rofa.papers.from_answers_to_hypotheses.methods import BranchSamplingEnsembl
 
 PAPER_ID = "from_answers_to_hypotheses"
 PAPER_TITLE = (
-    "From Answers to Hypotheses: Parallel Clinical Reasoning as a Decision Paradigm for Medical AI"
+    "From Answers to Hypotheses: Internal Consensus and Its Limits in Large Language Models"
 )
 PAPER_DESCRIPTION = (
     "Baseline experiments comparing greedy decoding and parallel branch sampling "
