@@ -77,7 +77,7 @@ This repository follows several explicit design principles:
 - It is **not** proposing JSON-only or constrained decoding.
 - It is **not** claiming that majority voting is sufficient.
 
-ROFA is an exploration tool, not a product.
+ROFA is an exploration tool, not yet a product.
 
 ---
 

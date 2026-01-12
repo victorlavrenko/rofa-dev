@@ -2,7 +2,7 @@
 
 ## Paper overview
 
-**From Answers to Hypotheses: Parallel Clinical Reasoning as a Decision Paradigm for Medical AI** is the
+**From Answers to Hypotheses: Internal Consensus and Its Limits in Large Language Models** is the
 baseline paper captured in this repository. It analyzes multi-branch sampling and consensus behavior for
 clinical QA prompts, contrasting greedy decoding with a 10-branch ensemble.
 
