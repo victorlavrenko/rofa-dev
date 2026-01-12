@@ -33,7 +33,8 @@ def main() -> None:
     """Generate analysis reports for one or more runs.
 
     Outputs:
-        Writes ``report.json`` under ``notebooks/from_answers_to_hypotheses/reports/<run_id>/`` by default.
+        Writes ``report.json`` under 
+        ``notebooks/from_answers_to_hypotheses/reports/<run_id>/`` by default.
 
     Failure modes:
         Raises FileNotFoundError if the run directory or summary log is missing.
