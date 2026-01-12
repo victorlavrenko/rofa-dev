@@ -44,7 +44,7 @@ paper-specific methods, prompts, and analyses under `rofa/papers/<paper_id>/`.
 
 - `from_answers_to_hypotheses`
   - Paper package: `rofa/papers/from_answers_to_hypotheses/`
-  - Paper documentation: `docs/papers/from_answers_to_hypotheses/README.md`
+  - Paper documentation: [`docs/papers/from_answers_to_hypotheses/README.md`](docs/papers/from_answers_to_hypotheses/README.md)
 
 ## Repository philosophy
 
@@ -96,8 +96,8 @@ ROFA is an exploration tool, not yet a product.
    - Upload to GitHub Releases (manual)
    - Others can reproduce all metrics from logs alone
 
-See `docs/REPRODUCIBILITY.md` for details.
+See [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md) for details.
 
 ## Reproduce paper results
 
-- [`from_answers_to_hypotheses`](docs/papers/from_answers_to_hypotheses/README.md)
+- from_answers_to_hypotheses: [`docs/papers/from_answers_to_hypotheses/README.md`](docs/papers/from_answers_to_hypotheses/README.md)
