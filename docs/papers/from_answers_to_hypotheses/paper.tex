@@ -107,6 +107,8 @@
     {\usebibmacro{eprint}}%
 }
 
+\newcommand{\extlink}{\raisebox{0.1ex}{\tiny$\nearrow$}}
+
 
 \title{%
 From Answers to Hypotheses\\[0.5ex]
@@ -146,18 +148,18 @@ Finally, we emphasize that this work is diagnostic rather than prescriptive. We 
 
 For each question, we generate:
 \begin{itemize}
-  \item a \textbf{greedy prediction} using deterministic decoding; and
-  \item an \textbf{ensemble} of $N=10$ independently sampled reasoning paths.
+  \item a greedy prediction using deterministic decoding; and
+  \item an ensemble of $N=10$ independently sampled reasoning paths.
 \end{itemize}
 
 Let $a_{i,j}$ denote the final answer of branch $j$ for question $i$. From the empirical distribution $P_i(a)$, we compute:
 \begin{itemize}
-  \item \textbf{leader answer:} $\arg\max_a P_i(a)$;
-  \item \textbf{maximum agreement fraction:}
+  \item leader answer: $\arg\max_a P_i(a)$;
+  \item maximum agreement fraction:
     \[
       \text{max\_frac}_i = \max_a P_i(a);
     \]
-  \item \textbf{Top-$k$ coverage:}
+  \item Top-$k$ coverage:
     \[
       \text{Top-}k = \mathbb{1}\{y_i \in \text{Top-}k(P_i)\}.
     \]
@@ -176,8 +178,8 @@ Let $\hat{y}_i^{(g)}$ denote the greedy prediction and $\hat{y}_i^{(m)}$ the maj
 
 Empirically:
 \begin{itemize}
-  \item Greedy accuracy: \textbf{65.75\%}
-  \item Majority accuracy: \textbf{66.75\%}
+  \item Greedy accuracy: 65.75\%
+  \item Majority accuracy: 66.75\%
 \end{itemize}
 
 A two-sided binomial test with null hypothesis $H_0: \pi = 0.6575$, where $\pi$ denotes the true success probability equal to the greedy decoding accuracy, yields a p-value of approximately $0.63$. We therefore fail to reject $H_0$, indicating that the observed difference between greedy and majority-vote accuracy is not statistically significant in this setting.
@@ -189,12 +191,12 @@ These results provide no statistical evidence in support of H1 in this experimen
 
 \textbf{H2.} When the final prediction is incorrect, the correct answer is often present among alternative hypotheses.
 
-We measure \textbf{Top-2 coverage}:
+We measure Top-2 coverage:
 \[
 \text{Top-2 coverage} = \frac{1}{N}\sum_i \mathbb{1}\{y_i \in \text{Top-2}(P_i)\}.
 \]
 
-Observed Top-2 coverage is \textbf{80.5\%}, compared to a greedy accuracy of \textbf{65.75\%}, corresponding to an absolute improvement of \textbf{14.75 percentage points}. Using a binomial model with null hypothesis $H_0:\ \pi = 0.6575$ (where $\pi$ is the baseline success probability equal to the greedy accuracy), this difference is highly statistically significant ($p$-value $\ll 10^{-6}$).
+Observed Top-2 coverage is 80.5\%, compared to a greedy accuracy of 65.75\%, corresponding to an absolute improvement of 14.75 percentage points. Using a binomial model with null hypothesis $H_0:\ \pi = 0.6575$ (where $\pi$ is the baseline success probability equal to the greedy accuracy), this difference is highly statistically significant ($p$-value $\ll 10^{-6}$).
 
 \paragraph{Relation to prior work.}
 This result is consistent with \textcite{kadavath2022know}, who show that models frequently possess internal signals of uncertainty. Our findings extend this by demonstrating that uncertainty manifests as \emph{explicit alternative hypotheses}, not merely as reduced confidence.
@@ -206,7 +208,7 @@ This result is consistent with \textcite{kadavath2022know}, who show that models
 We analyze unanimous cases where $\text{max\_frac}_i = 1.0$. Out of 400 questions:
 \begin{itemize}
   \item Unanimous cases: 151
-  \item Unanimous accuracy: \textbf{86.8\%}
+  \item Unanimous accuracy: 86.8\%
 \end{itemize}
 
 We test the null hypothesis $H_0: \pi \ge 0.95$, where $\pi$ denotes the true accuracy of unanimous predictions. A one-sided binomial test yields a p-value below $0.01$, allowing us to reject this hypothesis. Thus, even strong internal consensus does not guarantee near-perfect reliability.
@@ -243,9 +245,9 @@ In such cases, increased sampling or stronger aggregation cannot recover the cor
 
 Taken together, our results suggest three qualitatively distinct failure modes in LLM reasoning:
 \begin{enumerate}
-  \item \textbf{Selection errors}, where the correct hypothesis is present among alternatives but not selected as the final answer.
-  \item \textbf{Calibration or confidence errors}, where internal agreement or confidence is misaligned with correctness.
-  \item \textbf{Hypothesis space errors}, where the model converges on an internally coherent but systematically incorrect explanation.
+  \item Selection errors, where the correct hypothesis is present among alternatives but not selected as the final answer.
+  \item Calibration or confidence errors, where internal agreement or confidence is misaligned with correctness.
+  \item Hypothesis space errors, where the model converges on an internally coherent but systematically incorrect explanation.
 \end{enumerate}
 
 Importantly, only the first class is addressable through improved selection or aggregation, while the latter two require changes to training objectives or hypothesis representation.
@@ -277,13 +279,13 @@ We release a public, versioned snapshot of the complete codebase at
 Reproduction is supported by two dedicated notebooks:
 
 \begin{itemize}
-  \item \textbf{Reproduction notebook} (analysis only):\
+  \item Reproduction notebook (analysis only):\
   \href{https://github.com/victorlavrenko/rofa/blob/paper/from-answers-to-hypotheses-v1/notebooks/20_paper_reproduce.ipynb}{\texttt{20\_paper\_reproduce.ipynb}}
-  {\small[\href{https://colab.research.google.com/github/victorlavrenko/rofa/blob/paper/from-answers-to-hypotheses-v1/notebooks/20_paper_reproduce.ipynb}{Colab}]}
+  {\small[\href{https://colab.research.google.com/github/victorlavrenko/rofa/blob/paper/from-answers-to-hypotheses-v1/notebooks/20_paper_reproduce.ipynb}{Colab~\extlink}]}
 
-  \item \textbf{Generation notebook} (optional, stochastic):\
+  \item Generation notebook (optional, stochastic):\
   \href{https://github.com/victorlavrenko/rofa/blob/paper/from-answers-to-hypotheses-v1/notebooks/10_colab_generate.ipynb}{\texttt{10\_colab\_generate.ipynb}}
-  {\small[\href{https://colab.research.google.com/github/victorlavrenko/rofa/blob/paper/from-answers-to-hypotheses-v1/notebooks/10_colab_generate.ipynb}{Colab}]}
+  {\small[\href{https://colab.research.google.com/github/victorlavrenko/rofa/blob/paper/from-answers-to-hypotheses-v1/notebooks/10_colab_generate.ipynb}{Colab~\extlink}]}
 \end{itemize}
 
 \printbibliography[]
