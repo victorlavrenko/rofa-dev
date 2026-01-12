@@ -1,0 +1,22 @@
+{
+  "run_id": "k_sample_ensemble_e056184e9edc_20260112_123236",
+  "created_at": "2026-01-12T12:32:36.425124+00:00",
+  "method": "k_sample_ensemble",
+  "config": {
+    "method": "k_sample_ensemble",
+    "model_id": "HPAI-BSC/Llama3.1-Aloe-Beta-8B",
+    "seed": 42,
+    "max_new_tokens": 1024,
+    "n": 10,
+    "subjects": 20,
+    "max_per_subject": 1.55,
+    "dataset_name": "openlifescienceai/medmcqa",
+    "dataset_split": "validation",
+    "n_branches": 10,
+    "temperature": 0.8,
+    "top_p": 0.8,
+    "top_k": 50,
+    "question_set_id": "e056184e9edc"
+  },
+  "notes": null
+}

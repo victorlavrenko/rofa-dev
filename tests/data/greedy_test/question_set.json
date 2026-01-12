@@ -1,0 +1,80 @@
+{
+  "qs_id": "e056184e9edc",
+  "dataset_name": "openlifescienceai/medmcqa",
+  "dataset_split": "validation",
+  "dataset_revision": "0.0.0",
+  "dataset_fingerprint": "0bded8f921084989",
+  "selection": {
+    "seed": 42,
+    "n": 10,
+    "subjects": 20,
+    "max_per_subject": 1.55,
+    "filters": {
+      "choice_type": "single",
+      "exp_len_min": 20,
+      "exp_len_max": 500
+    },
+    "subject_counts": {
+      "Anatomy": 2,
+      "Physiology": 2,
+      "Pediatrics": 1,
+      "Microbiology": 1,
+      "Dental": 1,
+      "Surgery": 1,
+      "Forensic Medicine": 1,
+      "Pharmacology": 1
+    }
+  },
+  "examples": [
+    {
+      "dataset_index": 384,
+      "id": "6f132291-8a44-47a8-9979-1d359c074a7c",
+      "question_hash": "c748c7c09afb917161035d638e66156528dece35"
+    },
+    {
+      "dataset_index": 893,
+      "id": "3513f98e-19a9-4dfd-8f49-1e8514c3907c",
+      "question_hash": "51a40cbed540db4858f2694688a060e9c49f88eb"
+    },
+    {
+      "dataset_index": 398,
+      "id": "caec1fed-b5cf-4aa1-98bd-0c0806992f06",
+      "question_hash": "14d84aa8367c1748b29cdc5ae5bf342252a6a533"
+    },
+    {
+      "dataset_index": 652,
+      "id": "ddd74ca8-115f-444b-a754-28567fb618b1",
+      "question_hash": "afc37275a9d39b3fcc3e70f518665a00e6ee7062"
+    },
+    {
+      "dataset_index": 703,
+      "id": "d8a284c5-175a-4439-8ef2-5ff24b41f3cc",
+      "question_hash": "13699d5ab3293ae00ee74840698ad386de609d8e"
+    },
+    {
+      "dataset_index": 753,
+      "id": "defe1c85-63fe-4a16-ba10-b3749975818a",
+      "question_hash": "573bb38ee90f4b1046fc9b074dd978c456e69dc6"
+    },
+    {
+      "dataset_index": 928,
+      "id": "4e9a8341-05b8-4b00-859b-7a13d13b81a0",
+      "question_hash": "d4ded0eb30ad58ddf7993139f79acbb40d06aea0"
+    },
+    {
+      "dataset_index": 844,
+      "id": "e2dd93d8-8047-4e9a-9389-e2b1781f8a35",
+      "question_hash": "d3e0a39b564c7464b15648c5af29b69e07453b68"
+    },
+    {
+      "dataset_index": 481,
+      "id": "6f1fdbc9-920f-4bff-b2eb-ba300fd9cc59",
+      "question_hash": "21b73026d629072a6429eb2ad32ea2d68a9ae34b"
+    },
+    {
+      "dataset_index": 53,
+      "id": "3b150083-1a5e-49ef-bc36-41a06b677b32",
+      "question_hash": "3813ca4e39c025c31112b9c42dd06f5ba7c33ac9"
+    }
+  ]
+}

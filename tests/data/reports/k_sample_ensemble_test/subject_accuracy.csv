@@ -1,0 +1,9 @@
+subject_name,greedy_accuracy,leader_accuracy
+Anatomy,0.5,0.5
+Dental,1.0,1.0
+Forensic Medicine,0.0,0.0
+Microbiology,1.0,0.0
+Pediatrics,0.0,1.0
+Pharmacology,0.0,0.0
+Physiology,1.0,1.0
+Surgery,0.0,0.0

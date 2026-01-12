@@ -31,3 +31,6 @@ __pycache__/
 *.run.xml
 # LaTeX intermediate PDFs (optional)
 # *.pdf
+
+# test data
+!tests/data/**
