@@ -7,7 +7,6 @@ baseline paper captured in this repository. It analyzes multi-branch sampling an
 clinical QA prompts, contrasting greedy decoding with a 10-branch ensemble.
 
 - Paper package: [`rofa/papers/from_answers_to_hypotheses/`](../../../rofa/papers/from_answers_to_hypotheses/)
-- Paper manuscript: [`docs/papers/from_answers_to_hypotheses/paper.md`](paper.md)
 - Paper source: [`docs/papers/from_answers_to_hypotheses/paper.tex`](paper.tex)
 - Paper PDF: [`docs/papers/from_answers_to_hypotheses/paper.pdf`](paper.pdf)
 
