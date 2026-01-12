@@ -226,7 +226,7 @@ def rw_other_breakdown(
     bins_series = pd.cut(max_frac, bins=bins, include_lowest=True)
     breakdown = (
         pd.DataFrame({"bin": bins_series, "label": labels})
-        .groupby(["bin", "label"])
+        .groupby(["bin", "label"], observed=False)
         .size()
         .unstack(fill_value=0)
     )
