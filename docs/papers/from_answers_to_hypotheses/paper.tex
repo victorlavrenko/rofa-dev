@@ -127,7 +127,7 @@ Victor Lavrenko\\
 \maketitle
 
 \begin{abstract}
-Large language models (LLMs) now reach near-expert performance on medical QA and diagnostic benchmarks, yet this progress does not reliably translate into safe clinical decision support. We argue that a core limitation is not missing knowledge, but a failure to surface and reason over the \emph{distribution of internal hypotheses} expressed across alternative decoding trajectories. Using controlled multi-branch sampling on a medical QA benchmark, we show that (i) majority-vote self-consistency does not yield statistically significant accuracy gains over greedy decoding in our setting; (ii) the correct answer is often present among sampled hypotheses even when the final prediction is wrong; and (iii) strong internal consensus can still coincide with incorrect answers. We formalize these effects with statistical tests and characterize an alternative failure mode—\emph{errors of hypothesis space}—where models converge confidently on a systematically wrong explanation, motivating hypothesis-centric evaluation analogous to differential diagnosis.
+Large language models (LLMs) now reach near-expert performance on medical QA and diagnostic benchmarks, yet this progress does not reliably translate into safe clinical decision support. We argue that a core limitation is not missing knowledge, but a failure to surface and reason over the \emph{distribution of internal hypotheses} expressed across alternative decoding trajectories. Using controlled multi-branch sampling on a single medical QA benchmark with one model, one prompt, and a fixed sampling regime, we show that (i) majority-vote self-consistency does not yield statistically significant accuracy gains over greedy decoding in this setting; (ii) the correct answer is often present among sampled hypotheses even when the final prediction is wrong; and (iii) strong internal consensus can still coincide with incorrect answers. We formalize these effects with statistical tests and offer \emph{errors of hypothesis space} as an empirically motivated interpretation---not a formally isolated mechanism---where models converge confidently on a systematically wrong explanation, motivating hypothesis-centric evaluation analogous to differential diagnosis.
 \end{abstract}
 
 \section{Introduction}
@@ -142,14 +142,16 @@ Taken together, these findings suggest that uncertainty and alternative explanat
 
 Operationally, we observe this distribution through repeated sampling of the same prompt under fixed conditions, yielding an empirical distribution over final answers and associated explanations. We do not assume access to internal symbolic representations or latent states; rather, by ``hypotheses'' we refer to the set of discrete answer-level explanations implicitly instantiated by independent decoding trajectories. This framing allows us to analyze internal agreement, diversity, and failure modes without introducing new architectures or training procedures.
 
-Finally, we emphasize that this work is diagnostic rather than prescriptive. We do not propose a new aggregation rule, verification strategy, or decoding algorithm. Instead, our goal is to characterize when and why aggregation and internal agreement fail, even under idealized sampling conditions, and to identify a distinct failure mode---\emph{errors of hypothesis space}---in which models converge confidently on a systematically wrong explanation. Understanding these failures is a necessary step toward evaluation paradigms that more closely resemble differential diagnosis in clinical practice.
+Finally, we emphasize that this work is diagnostic rather than prescriptive. We do not propose a new aggregation rule, verification strategy, or decoding algorithm. Instead, our goal is to characterize when and why aggregation and internal agreement fail, even under idealized sampling conditions, and to identify a distinct failure mode---\emph{errors of hypothesis space}---as an empirically motivated interpretation in which models converge confidently on a systematically wrong explanation. Understanding these failures is a necessary step toward evaluation paradigms that more closely resemble differential diagnosis in clinical practice.
 
 In this work, we evaluate a sequence of hypotheses about ensemble reasoning.
 We begin by testing whether aggregation improves accuracy (H1), whether correct
 answers tend to appear among alternative hypotheses (H2), and whether internal
 consensus predicts correctness (H3). We then study the feasibility of selective
 leader override as a function of internal consensus, and conclude with implications
-and future directions.
+and future directions. All claims are scoped to a single medical multiple-choice
+QA benchmark, one model and prompt configuration, and a fixed sampling regime; we
+do not claim generality beyond these conditions.
 
 \section{Problem Setup and Definitions}
 
@@ -208,7 +210,7 @@ Empirically:
 A two-sided binomial test with null hypothesis $H_0: \pi = 0.6575$, where $\pi$ denotes the true success probability equal to the greedy decoding accuracy, yields a p-value of approximately $0.63$. We therefore fail to reject $H_0$, indicating that the observed difference between greedy and majority-vote accuracy is not statistically significant in this setting.
 
 \paragraph{Interpretation.}
-These results provide no statistical evidence in support of H1 in this experimental regime, suggesting that majority-vote aggregation does not reliably improve accuracy over greedy decoding under the tested conditions. While self-consistency can improve performance in some regimes \parencite{wang2022selfconsistency}, our results show that such gains are not robust in this setting. Aggregation alone is therefore insufficient as a general reliability mechanism.
+These results provide no statistical evidence in support of H1 in this experimental regime, suggesting that majority-vote aggregation does not reliably improve accuracy over greedy decoding under the tested conditions. While self-consistency can improve performance in some regimes \parencite{wang2022selfconsistency}, our results show that such gains are not evident in this single-model, single-dataset setting. Aggregation alone is therefore insufficient as a general reliability mechanism under these conditions.
 
 \subsection{Correct Answers Appear Among Alternatives}
 
@@ -297,25 +299,25 @@ Second, we measured the required false-override suppression, defined as the rati
 
 The analysis reveals a sharp, regime-dependent trade-off. Broad regimes that include high-consensus predictions offer larger theoretical gains but require extremely high leader override precision, making them practically infeasible. In contrast, more conservative regimes focused on high-uncertainty cases---where top-1 and top-2 receive comparable support---exhibit substantially more favorable error budgets. In these regimes, even moderately accurate leader override policies yield meaningful improvements while incurring limited risk.
 
-While the available evaluation set limits statistical power for fine-grained comparisons between neighboring regimes, the qualitative pattern is robust. In particular, excluding high-consensus predictions (e.g., regimes with very high top-1 vote counts) leads to a statistically significant reduction in the precision required of a leader override algorithm, compared to regimes that include such cases.
+While the available evaluation set limits statistical power for fine-grained comparisons between neighboring regimes, the qualitative pattern persists within this dataset and sampling configuration. In particular, excluding high-consensus predictions (e.g., regimes with very high top-1 vote counts) leads to a statistically significant reduction in the precision required of a leader override algorithm, compared to regimes that include such cases.
 
 We observe that moving the upper bound on top-1 vote counts from high-consensus regimes to uncertainty-focused regimes yields a more than twofold reduction in required false-override suppression (from $\approx 2.4$ to $\approx 1.0$), a difference that is statistically significant ($p < 10^{-6}$).
 
 \section{Discussion}
 
-The analysis presented in this work suggests that improving LLM performance in high-stakes medical settings is not primarily a matter of producing a single more accurate answer, but of reasoning over structured sets of competing hypotheses. In particular, the presence of meaningful top-2 coverage opens a path toward correcting errors, but only under carefully constrained decision regimes.
+The analysis presented in this work suggests that improving LLM performance in high-stakes medical settings is not primarily a matter of producing a single more accurate answer, but of reasoning over structured sets of competing hypotheses. In particular, the presence of meaningful top-2 coverage opens a path toward correcting errors, but only under carefully constrained decision regimes. These conclusions are limited to the single medical multiple-choice QA benchmark, model, prompt, and sampling settings tested here; broader generalization remains an open question.
 
-These findings suggest a staged and risk-aware strategy for selective leader override. Rather than attempting to correct all errors, override algorithms should initially target regimes with high uncertainty and favorable error budgets, where the cost of a mistaken override is relatively low and the likelihood of successful correction is higher. As decision accuracy improves, such algorithms could progressively expand into more challenging regimes.
+These findings suggest a staged and risk-aware strategy for selective leader override. Rather than attempting to correct all errors, override algorithms should initially target regimes with high uncertainty and favorable error budgets, where the cost of a mistaken override is relatively low and the likelihood of successful correction is higher. As decision accuracy improves, such algorithms could progressively expand into more challenging regimes, but this should be evaluated in additional datasets and model families before drawing general claims.
 
-Importantly, this perspective reframes leader override not as a binary operation applied globally, but as a selective intervention governed by explicit uncertainty thresholds and error budgets. Even conservative strategies restricted to high-uncertainty regimes can already produce substantial gains, without requiring near-perfect override decisions.
+Importantly, this perspective reframes leader override not as a binary operation applied globally, but as a selective intervention governed by explicit uncertainty thresholds and error budgets. Even conservative strategies restricted to high-uncertainty regimes can already produce substantial gains in this setting, without requiring near-perfect override decisions.
 
 \subsection{Errors of Hypothesis Space}
 
-The failure to find evidence supporting H3 motivates an alternative explanation for these errors:
+The failure to find evidence supporting H3 motivates an alternative, empirically grounded interpretation for these errors:
 
 \paragraph{H3$'$.\ }Some errors arise because the correct hypothesis is poorly represented or absent from the model's hypothesis space.
 
-Under this view, unanimous but incorrect predictions correspond to cases where the model's hypothesis space is locally coherent but globally misaligned with the task. Such errors are not reducible to stochastic selection noise and therefore cannot be remedied by increased sampling or voting alone.
+Under this view, unanimous but incorrect predictions correspond to cases where the model's hypothesis space is locally coherent but globally misaligned with the task. This interpretation is not yet formally isolated from selection effects; the current analysis does not provide an operational test to conclusively separate missing hypotheses from low-probability selection. Such errors are therefore not reducible to stochastic selection noise alone and cannot be remedied by increased sampling or voting alone.
 
 In such cases, increased sampling or stronger aggregation cannot recover the correct answer. This reframes aggregation as a \emph{diagnostic probe} rather than a solution.
 
@@ -340,12 +342,15 @@ Importantly, only the first class is addressable through improved selection or a
 \section{Conclusion}
 
 We evaluated a sequence of hypotheses about ensemble reasoning and selective
-decision-making. We showed that aggregation improves accuracy (H1), that correct
-answers frequently appear among alternative hypotheses (H2), and that internal
-consensus strongly predicts correctness (H3). Building on these findings, we
-demonstrated that selective leader override is feasible under conservative
-uncertainty filtering, substantially reducing required override precision while
-retaining meaningful error coverage. Together, these results support treating
+decision-making. In this setting, majority-vote aggregation did not yield a
+statistically significant accuracy improvement over greedy decoding (H1), while
+correct answers frequently appeared among alternative hypotheses (H2). Strong
+internal consensus did not guarantee correctness (H3), motivating the interpretive
+possibility of hypothesis-space errors (H3$'$), though we do not yet isolate that
+mechanism empirically. We also found partial support for H4: selective leader
+override appears feasible in low-consensus regimes with favorable error budgets,
+but the evidence is limited to the single dataset, model, and sampling configuration
+tested here. Together, these results underscore the analytical value of treating
 reasoning as a distribution rather than a single trajectory.
 
 \section{Future Work}
