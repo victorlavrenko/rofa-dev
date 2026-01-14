@@ -794,6 +794,34 @@ def top2_flip_analysis_relative(
     return matrix, rectangles, threshold_rectangles, tie_stats
 
 
+def top2_flip_analysis_relative_with_plot(
+    df_branches: pd.DataFrame,
+    *,
+    baseline_acc: float,
+    total_n: int = 400,
+    strict: bool = True,
+    min_support: int = 1,
+    ratio_thresholds: Sequence[float] = tuple(round(1.0 + 0.1 * i, 1) for i in range(41)),
+    use_frontier_df: Optional[pd.DataFrame] = None,
+) -> Tuple[
+    pd.DataFrame, pd.DataFrame, pd.DataFrame, Dict[str, int], object, object, pd.DataFrame
+]:
+    """Run gap-based top-2 flip analysis and plot feasibility in one step."""
+    matrix, rectangles, threshold_rectangles, tie_stats = top2_flip_analysis_relative(
+        df_branches,
+        strict=strict,
+        min_support=min_support,
+        ratio_thresholds=ratio_thresholds,
+    )
+    from rofa.analysis.plots import plot_top2_flip_feasibility
+
+    plot_source = use_frontier_df if use_frontier_df is not None else threshold_rectangles
+    fig, ax, plot_df = plot_top2_flip_feasibility(
+        plot_source, baseline_acc, total_n, use_frontier_df=None
+    )
+    return matrix, rectangles, threshold_rectangles, tie_stats, fig, ax, plot_df
+
+
 def make_gap_neighbor_rows(
     df_branches: pd.DataFrame,
     optimal_df: pd.DataFrame,
