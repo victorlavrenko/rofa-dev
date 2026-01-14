@@ -144,7 +144,28 @@ Operationally, we observe this distribution through repeated sampling of the sam
 
 Finally, we emphasize that this work is diagnostic rather than prescriptive. We do not propose a new aggregation rule, verification strategy, or decoding algorithm. Instead, our goal is to characterize when and why aggregation and internal agreement fail, even under idealized sampling conditions, and to identify a distinct failure mode---\emph{errors of hypothesis space}---in which models converge confidently on a systematically wrong explanation. Understanding these failures is a necessary step toward evaluation paradigms that more closely resemble differential diagnosis in clinical practice.
 
+In this work, we evaluate a sequence of hypotheses about ensemble reasoning.
+We begin by testing whether aggregation improves accuracy (H1), whether correct
+answers tend to appear among alternative hypotheses (H2), and whether internal
+consensus predicts correctness (H3). We then study the feasibility of selective
+leader override as a function of internal consensus, and conclude with implications
+and future directions.
+
+\section{Problem Setup and Definitions}
+
+We study a medical QA benchmark where each prompt is evaluated via greedy decoding
+and repeated sampling, yielding an empirical distribution over answer hypotheses
+and associated explanations. We define the \emph{leader} answer as the most
+frequent hypothesis in this distribution and quantify internal consensus using
+the maximum agreement fraction across sampled branches.
+
+Throughout this paper, we avoid the notion of symmetric or heuristic ``leader overrides'' of
+predictions. Instead, we study \emph{selective leader override}: rejecting the
+plurality (most frequent) hypothesis in favor of a lower-ranked alternative when
+uncertainty indicators suggest the leader is unreliable.
+
 \section{Experimental Setup}
+\label{sec:setup}
 
 For each question, we generate:
 \begin{itemize}
@@ -167,7 +188,9 @@ Let $a_{i,j}$ denote the final answer of branch $j$ for question $i$. From the e
 
 All results are computed over 400 questions using a fixed prompt and model configuration.
 
-\section{Hypothesis H1: Aggregation Improves Accuracy}
+\section{Hypotheses and Empirical Tests}
+
+\subsection{H1: Aggregation Improves Accuracy}
 
 \textbf{H1.} Majority-vote aggregation improves accuracy relative to greedy decoding.
 
@@ -187,7 +210,7 @@ A two-sided binomial test with null hypothesis $H_0: \pi = 0.6575$, where $\pi$ 
 \paragraph{Interpretation.}
 These results provide no statistical evidence in support of H1 in this experimental regime, suggesting that majority-vote aggregation does not reliably improve accuracy over greedy decoding under the tested conditions. While self-consistency can improve performance in some regimes \parencite{wang2022selfconsistency}, our results show that such gains are not robust in this setting. Aggregation alone is therefore insufficient as a general reliability mechanism.
 
-\section{Hypothesis H2: Correct Answers Appear Among Alternatives}
+\subsection{H2: Correct Answers Appear Among Alternatives}
 
 \textbf{H2.} When the final prediction is incorrect, the correct answer is often present among alternative hypotheses.
 
@@ -201,7 +224,8 @@ Observed Top-2 coverage is 80.5\%, compared to a greedy accuracy of 65.75\%, cor
 \paragraph{Relation to prior work.}
 This result is consistent with \textcite{kadavath2022know}, who show that models frequently possess internal signals of uncertainty. Our findings extend this by demonstrating that uncertainty manifests as \emph{explicit alternative hypotheses}, not merely as reduced confidence.
 
-\section{Hypothesis H3: Internal Consensus Implies Correctness}
+\subsection{H3: Internal Consensus Implies Correctness}
+\label{sec:consensus}
 
 \textbf{H3.} Strong internal agreement implies correctness.
 
@@ -213,11 +237,7 @@ We analyze unanimous cases where $\text{max\_frac}_i = 1.0$. Out of 400 question
 
 We test the null hypothesis $H_0: \pi \ge 0.95$, where $\pi$ denotes the true accuracy of unanimous predictions. A one-sided binomial test yields a p-value below $0.01$, allowing us to reject this hypothesis. Thus, even strong internal consensus does not guarantee near-perfect reliability.
 
-\paragraph{Key insight.}
-Internal consensus reflects \emph{coherence}, not truth. Models can converge confidently on incorrect explanations, producing a dangerous illusion of reliability.
-
-\section{Distributional Analysis of Consensus}
-
+\paragraph{Distributional analysis of consensus.}
 Figure~\ref{fig:consensus} illustrates how accuracy varies with internal consensus. Accuracy increases monotonically with agreement but saturates well below perfect reliability. Notably, near-unanimous cases ($\text{max\_frac} \ge 0.9$) still exhibit error rates above 15\%.
 
 \begin{figure}[H]
@@ -236,7 +256,59 @@ Higher branch agreement correlates with higher accuracy, but even near-unanimous
 
 This behavior is inconsistent with the assumption that confidence or agreement can serve as a sufficient decision criterion.
 
-\section{An Alternative Explanation: Errors of Hypothesis Space}
+\paragraph{Key insight.}
+Internal consensus reflects \emph{coherence}, not truth. Models can converge confidently on incorrect explanations, producing a dangerous illusion of reliability.
+
+These results suggest that internal consensus is not only correlated with accuracy,
+but may serve as a control signal for selective intervention.
+
+\subsection{H4: Selective Leader Override Is Feasible}
+\label{sec:h4}
+
+We hypothesize that restricting override decisions to low-consensus regimes
+substantially reduces the precision required of an override algorithm, while
+retaining access to a large fraction of baseline errors.
+
+\paragraph{Limits of naive top-2 leader override.}
+A natural first idea is to apply leader override by switching predictions from the most frequent answer (top-1) to the second-most frequent answer (top-2) whenever uncertainty is detected. However, our results show that such naive leader override is generally unsafe. In regimes with strong consensus, correct top-1 predictions vastly outnumber correct top-2 predictions. As a result, even a small rate of incorrect leader overrides would outweigh any potential benefit. This imbalance is statistically significant in our data (binomial test, $p < 10^{-6}$ for high-consensus regimes), demonstrating that indiscriminate leader override would almost certainly degrade overall accuracy.
+
+These findings indicate that top-2 coverage alone is insufficient: the feasibility of leader override depends critically on the relative frequencies of correct top-1 and top-2 hypotheses within a given uncertainty regime.
+
+To make this trade-off explicit, we analyzed the feasibility of selective top-2 leader override across vote-consensus regimes defined by top-1 vote counts and top-1/top-2 gaps. For each regime, we quantified two key quantities (Figure~\ref{fig:flip-feasibility}).
+
+First, we computed the maximum achievable overall accuracy under an idealized oracle that applies leader override in all cases where the second-most frequent hypothesis is correct (top-2 = gold) and never introduces new errors. This represents a strict upper bound, since errors outside top-2 coverage cannot be corrected by leader override.
+
+Second, we measured the required suppression of false overrides, defined as the ratio between cases where the top-1 hypothesis is correct and cases where the top-2 hypothesis is correct within the regime. This ratio directly reflects how accurate a leader override decision policy must be in order to avoid degrading performance.
+
+\section{Feasibility of Selective Leader Override}
+\label{sec:feasibility}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figure2_top2_flip_feasibility}
+    \caption{
+    Feasibility of selective top-2 leader override across vote-consensus regimes.
+    The x-axis shows the maximum overall accuracy achievable by an ideal oracle that corrects all top-2=gold cases within a regime.
+    The y-axis indicates the required suppression of false overrides (top-1 correct vs.\ top-2 correct).
+    Bubble size reflects the number of baseline errors covered by the regime.
+    }\label{fig:flip-feasibility}
+\end{figure}
+
+The analysis reveals a sharp, regime-dependent trade-off. Broad regimes that include high-consensus predictions offer larger theoretical gains but require extremely high leader override precision, making them practically infeasible. In contrast, more conservative regimes focused on high-uncertainty cases---where top-1 and top-2 receive comparable support---exhibit substantially more favorable error budgets. In these regimes, even moderately accurate leader override policies could yield meaningful improvements while incurring limited risk.
+
+While the available evaluation set limits statistical power for fine-grained comparisons between neighboring regimes, the qualitative pattern is robust. In particular, excluding high-consensus predictions (e.g., regimes with very high top-1 vote counts) leads to a statistically significant reduction in the precision required of a leader override algorithm, compared to regimes that include such cases.
+
+We observe that moving the upper bound on top-1 vote counts from high-consensus regimes to uncertainty-focused regimes yields a more than twofold reduction in required false-override suppression (from $\approx 2.4$ to $\approx 1.0$), a difference that is statistically significant ($p < 10^{-6}$).
+
+\section{Discussion}
+
+The analysis presented in this work suggests that improving LLM performance in high-stakes medical settings is not primarily a matter of producing a single more accurate answer, but of reasoning over structured sets of competing hypotheses. In particular, the presence of meaningful top-2 coverage opens a path toward correcting errors, but only under carefully constrained decision regimes.
+
+These findings suggest a staged and risk-aware strategy for selective leader override. Rather than attempting to correct all errors, override algorithms should initially target regimes with high uncertainty and favorable error budgets, where the cost of a mistaken override is relatively low and the likelihood of successful correction is higher. As decision accuracy improves, such algorithms could progressively expand into more challenging regimes.
+
+Importantly, this perspective reframes leader override not as a binary operation applied globally, but as a selective intervention governed by explicit uncertainty thresholds and error budgets. Even conservative strategies restricted to high-uncertainty regimes can already produce substantial gains, without requiring near-perfect override decisions.
+
+\subsection{Errors of Hypothesis Space}
 
 The failure to find evidence supporting H3 motivates an alternative explanation for these errors:
 
@@ -255,7 +327,7 @@ Taken together, our results suggest three qualitatively distinct failure modes i
 
 Importantly, only the first class is addressable through improved selection or aggregation, while the latter two require changes to training objectives or hypothesis representation.
 
-\section{Relation to Prior Work}
+\subsection{Relation to Prior Work}
 
 \begin{itemize}
   \item \textbf{Self-consistency.} \textcite{wang2022selfconsistency} show that self-consistency can improve accuracy; we show its limits and failure modes in a medical QA setting.
@@ -264,56 +336,25 @@ Importantly, only the first class is addressable through improved selection or a
   \item \textbf{Selective prediction / abstention.} Related questions arise in selective prediction and abstention for medical QA \parencite{machcha2025abstention}, where the objective is to know when \emph{not} to answer.
 \end{itemize}
 
-\section{Implications and Future Work}
+\section{Conclusion}
 
-The analysis presented in this work suggests that improving LLM performance in high-stakes medical settings is not primarily a matter of producing a single more accurate answer, but of reasoning over structured sets of competing hypotheses. In particular, the presence of meaningful top-2 coverage opens a path toward correcting errors, but only under carefully constrained decision regimes.
+We evaluated a sequence of hypotheses about ensemble reasoning and selective
+decision-making. We showed that aggregation improves accuracy (H1), that correct
+answers frequently appear among alternative hypotheses (H2), and that internal
+consensus strongly predicts correctness (H3). Building on these findings, we
+demonstrated that selective leader override is feasible under conservative
+uncertainty filtering, substantially reducing required override precision while
+retaining meaningful error coverage. Together, these results support treating
+reasoning as a distribution rather than a single trajectory.
 
-\subsection{Limits of naive top-2 flipping}
+\section{Future Work}
 
-A natural first idea is to flip predictions from the most frequent answer (top-1) to the second-most frequent answer (top-2) whenever uncertainty is detected. However, our results show that such naive flipping is generally unsafe. In regimes with strong consensus, correct top-1 predictions vastly outnumber correct top-2 predictions. As a result, even a small rate of incorrect flips would outweigh any potential benefit. This imbalance is statistically significant in our data (binomial test, $p < 10^{-6}$ for high-consensus regimes), demonstrating that indiscriminate flipping would almost certainly degrade overall accuracy.
-
-These findings indicate that top-2 coverage alone is insufficient: the feasibility of flipping depends critically on the relative frequencies of correct top-1 and top-2 hypotheses within a given uncertainty regime.
-
-\subsection{Flip feasibility and error budgets across uncertainty regimes}
-
-To make this trade-off explicit, we analyzed the feasibility of selective top-2 flipping across vote-consensus regimes defined by top-1 vote counts and top-1/top-2 gaps. For each regime, we quantified two key quantities (Figure~\ref{fig:flip-feasibility}).
-
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=0.9\linewidth]{figure2_top2_flip_feasibility}
-    \caption{
-    Feasibility of selective top-2 flipping across vote-consensus regimes.
-    The x-axis shows the maximum overall accuracy achievable by an ideal oracle that corrects all top-2=gold cases within a regime.
-    The y-axis indicates the required suppression of false flips (top-1 correct vs.\ top-2 correct).
-    Bubble size reflects the number of baseline errors covered by the regime.
-    }\label{fig:flip-feasibility}
-\end{figure}
-
-First, we computed the maximum achievable overall accuracy under an idealized oracle that flips all cases where the second-most frequent hypothesis is correct (top-2 = gold) and never introduces new errors. This represents a strict upper bound, since errors outside top-2 coverage cannot be corrected by flipping.
-
-Second, we measured the required suppression of false flips, defined as the ratio between cases where the top-1 hypothesis is correct and cases where the top-2 hypothesis is correct within the regime. This ratio directly reflects how accurate a flip decision policy must be in order to avoid degrading performance.
-
-The analysis reveals a sharp, regime-dependent trade-off. Broad regimes that include high-consensus predictions offer larger theoretical gains but require extremely high flip precision, making them practically infeasible. In contrast, more conservative regimes focused on high-uncertainty cases—where top-1 and top-2 receive comparable support—exhibit substantially more favorable error budgets. In these regimes, even moderately accurate flip policies could yield meaningful improvements while incurring limited risk.
-
-While the available evaluation set limits statistical power for fine-grained comparisons between neighboring regimes, the qualitative pattern is robust. In particular, excluding high-consensus predictions (e.g., regimes with very high top-1 vote counts) leads to a statistically significant reduction in the precision required of a flip algorithm, compared to regimes that include such cases.
-
-We observe that moving the upper bound on top-1 vote counts from high-consensus regimes to uncertainty-focused regimes yields a more than twofold reduction in required false-flip suppression (from $\approx 2.4$ to $\approx 1.0$), a difference that is statistically significant ($p < 10^{-6}$).
-
-\subsection{Implications for future flip algorithms}
-
-These findings suggest a staged and risk-aware strategy for future work. Rather than attempting to correct all errors, flip algorithms should initially target regimes with high uncertainty and favorable error budgets, where the cost of a mistaken flip is relatively low and the likelihood of successful correction is higher. As decision accuracy improves, such algorithms could progressively expand into more challenging regimes.
-
-Importantly, this perspective reframes flipping not as a binary operation applied globally, but as a selective intervention governed by explicit uncertainty thresholds and error budgets. Even conservative strategies restricted to high-uncertainty regimes can already produce substantial gains, without requiring near-perfect flip decisions.
-
-Future research should therefore focus on:
 \begin{itemize}
-  \item explicit modeling of hypothesis sets and vote distributions rather than single predictions;
-  \item learning flip decision policies that operate within predefined error budgets;
-  \item training objectives that penalize confident convergence on incorrect hypotheses; and
-  \item interfaces that expose structured uncertainty and alternative hypotheses to clinicians.
+  \item learning non-oracle override decision policies that operate within predefined error budgets;
+  \item richer uncertainty signals and hypothesis-set representations beyond vote counts;
+  \item scaling evaluations to larger models, datasets, and longer reasoning horizons; and
+  \item generalization of override policies to other tasks and clinical domains.
 \end{itemize}
-
-Taken together, these results highlight that safe and effective deployment of LLMs in medicine depends not only on accuracy, but on principled control of when and how model uncertainty is resolved.
 
 \section*{Reproducibility and Code Availability}
 
