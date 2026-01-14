@@ -117,8 +117,8 @@ def plot_top2_flip_feasibility(
             fontsize=8,
         )
 
-    ax.set_title("Achievable accuracy vs required false-flip suppression")
-    ax.set_xlabel("Oracle overall accuracy (ideal top-2 flip)")
+    ax.set_title("Achievable accuracy vs required false-override suppression")
+    ax.set_xlabel("Oracle overall accuracy (ideal top-2 alternative selection)")
     ax.set_ylabel("Required FP suppression (X / Y)")
     ax.legend(loc="best")
     fig.tight_layout()

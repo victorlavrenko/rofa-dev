@@ -190,7 +190,7 @@ All results are computed over 400 questions using a fixed prompt and model confi
 
 \section{Hypotheses and Empirical Tests}
 
-\subsection{H1: Aggregation Improves Accuracy}
+\subsection{Aggregation Improves Accuracy}
 
 \textbf{H1.} Majority-vote aggregation improves accuracy relative to greedy decoding.
 
@@ -210,7 +210,7 @@ A two-sided binomial test with null hypothesis $H_0: \pi = 0.6575$, where $\pi$ 
 \paragraph{Interpretation.}
 These results provide no statistical evidence in support of H1 in this experimental regime, suggesting that majority-vote aggregation does not reliably improve accuracy over greedy decoding under the tested conditions. While self-consistency can improve performance in some regimes \parencite{wang2022selfconsistency}, our results show that such gains are not robust in this setting. Aggregation alone is therefore insufficient as a general reliability mechanism.
 
-\subsection{H2: Correct Answers Appear Among Alternatives}
+\subsection{Correct Answers Appear Among Alternatives}
 
 \textbf{H2.} When the final prediction is incorrect, the correct answer is often present among alternative hypotheses.
 
@@ -224,7 +224,7 @@ Observed Top-2 coverage is 80.5\%, compared to a greedy accuracy of 65.75\%, cor
 \paragraph{Relation to prior work.}
 This result is consistent with \textcite{kadavath2022know}, who show that models frequently possess internal signals of uncertainty. Our findings extend this by demonstrating that uncertainty manifests as \emph{explicit alternative hypotheses}, not merely as reduced confidence.
 
-\subsection{H3: Internal Consensus Implies Correctness}
+\subsection{Internal Consensus Implies Correctness}
 \label{sec:consensus}
 
 \textbf{H3.} Strong internal agreement implies correctness.
@@ -262,7 +262,7 @@ Internal consensus reflects \emph{coherence}, not truth. Models can converge con
 These results suggest that internal consensus is not only correlated with accuracy,
 but may serve as a control signal for selective intervention.
 
-\subsection{H4: Selective Leader Override Is Feasible}
+\subsection{Selective Leader Override Is Feasible}
 \label{sec:h4}
 
 We hypothesize that restricting override decisions to low-consensus regimes
