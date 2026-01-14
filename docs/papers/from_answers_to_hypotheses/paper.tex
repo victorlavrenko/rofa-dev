@@ -190,7 +190,7 @@ All results are computed over 400 questions using a fixed prompt and model confi
 
 \section{Hypotheses and Empirical Tests}
 
-\subsection{Aggregation Improves Accuracy}
+\subsection*{Aggregation Improves Accuracy}
 
 \textbf{H1.} Majority-vote aggregation improves accuracy relative to greedy decoding.
 
@@ -210,7 +210,7 @@ A two-sided binomial test with null hypothesis $H_0: \pi = 0.6575$, where $\pi$ 
 \paragraph{Interpretation.}
 These results provide no statistical evidence in support of H1 in this experimental regime, suggesting that majority-vote aggregation does not reliably improve accuracy over greedy decoding under the tested conditions. While self-consistency can improve performance in some regimes \parencite{wang2022selfconsistency}, our results show that such gains are not robust in this setting. Aggregation alone is therefore insufficient as a general reliability mechanism.
 
-\subsection{Correct Answers Appear Among Alternatives}
+\subsection*{Correct Answers Appear Among Alternatives}
 
 \textbf{H2.} When the final prediction is incorrect, the correct answer is often present among alternative hypotheses.
 
@@ -224,7 +224,7 @@ Observed Top-2 coverage is 80.5\%, compared to a greedy accuracy of 65.75\%, cor
 \paragraph{Relation to prior work.}
 This result is consistent with \textcite{kadavath2022know}, who show that models frequently possess internal signals of uncertainty. Our findings extend this by demonstrating that uncertainty manifests as \emph{explicit alternative hypotheses}, not merely as reduced confidence.
 
-\subsection{Internal Consensus Implies Correctness}
+\subsection*{Internal Consensus Implies Correctness}
 \label{sec:consensus}
 
 \textbf{H3.} Strong internal agreement implies correctness.
@@ -263,12 +263,11 @@ These results suggest that internal consensus is not only correlated with accura
 but may serve as a control signal for selective intervention.
 These findings motivate evaluating whether selective leader override is practically feasible when restricted to low-consensus regimes.
 
-\subsection{Hypothesis H4: Selective Leader Override Is Feasible}
-\label{sec:h4}
+\subsection*{Selective Leader Override Is Feasible}\label{sec:h4}
 
-We hypothesize that restricting override decisions to low-consensus regimes
-substantially reduces the precision required of an override algorithm, while
-retaining access to a substantial fraction of baseline errors.
+\textbf{H4.} Restricting leader override decisions to low-consensus regimes
+substantially reduces the precision required of an override algorithm while
+preserving access to a significant fraction of baseline errors.
 
 \paragraph{Limits of naive top-2 leader override.}
 A natural first idea is to apply leader override by switching predictions from the most frequent answer (top-1) to the second-most frequent answer (top-2) whenever uncertainty is detected. However, our results show that such naive leader override is generally unsafe. In regimes with strong consensus, correct top-1 predictions vastly outnumber correct top-2 predictions. As a result, even a small rate of incorrect leader overrides would outweigh any potential benefit. This imbalance is statistically significant in our data (binomial test, $p < 10^{-6}$ for high-consensus regimes), demonstrating that indiscriminate leader override would almost certainly degrade overall accuracy.
