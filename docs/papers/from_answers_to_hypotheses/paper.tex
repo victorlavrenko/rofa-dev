@@ -261,13 +261,14 @@ Internal consensus reflects \emph{coherence}, not truth. Models can converge con
 
 These results suggest that internal consensus is not only correlated with accuracy,
 but may serve as a control signal for selective intervention.
+These findings motivate evaluating whether selective leader override is practically feasible when restricted to low-consensus regimes.
 
-\subsection{Selective Leader Override Is Feasible}
+\subsection{Hypothesis H4: Selective Leader Override Is Feasible}
 \label{sec:h4}
 
 We hypothesize that restricting override decisions to low-consensus regimes
 substantially reduces the precision required of an override algorithm, while
-retaining access to a large fraction of baseline errors.
+retaining access to a substantial fraction of baseline errors.
 
 \paragraph{Limits of naive top-2 leader override.}
 A natural first idea is to apply leader override by switching predictions from the most frequent answer (top-1) to the second-most frequent answer (top-2) whenever uncertainty is detected. However, our results show that such naive leader override is generally unsafe. In regimes with strong consensus, correct top-1 predictions vastly outnumber correct top-2 predictions. As a result, even a small rate of incorrect leader overrides would outweigh any potential benefit. This imbalance is statistically significant in our data (binomial test, $p < 10^{-6}$ for high-consensus regimes), demonstrating that indiscriminate leader override would almost certainly degrade overall accuracy.
@@ -278,7 +279,7 @@ To make this trade-off explicit, we analyzed the feasibility of selective top-2 
 
 First, we computed the maximum achievable overall accuracy under an idealized oracle that applies leader override in all cases where the second-most frequent hypothesis is correct (top-2 = gold) and never introduces new errors. This represents a strict upper bound, since errors outside top-2 coverage cannot be corrected by leader override.
 
-Second, we measured the required suppression of false overrides, defined as the ratio between cases where the top-1 hypothesis is correct and cases where the top-2 hypothesis is correct within the regime. This ratio directly reflects how accurate a leader override decision policy must be in order to avoid degrading performance.
+Second, we measured the required false-override suppression, defined as the ratio between cases where the top-1 hypothesis is correct and cases where the top-2 hypothesis is correct within the regime. This ratio directly reflects how accurate a leader override decision policy must be in order to avoid degrading performance.
 
 \section{Feasibility of Selective Leader Override}
 \label{sec:feasibility}
@@ -289,12 +290,12 @@ Second, we measured the required suppression of false overrides, defined as the 
     \caption{
     Feasibility of selective top-2 leader override across vote-consensus regimes.
     The x-axis shows the maximum overall accuracy achievable by an ideal oracle that corrects all top-2=gold cases within a regime.
-    The y-axis indicates the required suppression of false overrides (top-1 correct vs.\ top-2 correct).
+    The y-axis indicates the required false-override suppression (top-1 correct vs.\ top-2 correct).
     Bubble size reflects the number of baseline errors covered by the regime.
     }\label{fig:flip-feasibility}
 \end{figure}
 
-The analysis reveals a sharp, regime-dependent trade-off. Broad regimes that include high-consensus predictions offer larger theoretical gains but require extremely high leader override precision, making them practically infeasible. In contrast, more conservative regimes focused on high-uncertainty cases---where top-1 and top-2 receive comparable support---exhibit substantially more favorable error budgets. In these regimes, even moderately accurate leader override policies could yield meaningful improvements while incurring limited risk.
+The analysis reveals a sharp, regime-dependent trade-off. Broad regimes that include high-consensus predictions offer larger theoretical gains but require extremely high leader override precision, making them practically infeasible. In contrast, more conservative regimes focused on high-uncertainty cases---where top-1 and top-2 receive comparable support---exhibit substantially more favorable error budgets. In these regimes, even moderately accurate leader override policies yield meaningful improvements while incurring limited risk.
 
 While the available evaluation set limits statistical power for fine-grained comparisons between neighboring regimes, the qualitative pattern is robust. In particular, excluding high-consensus predictions (e.g., regimes with very high top-1 vote counts) leads to a statistically significant reduction in the precision required of a leader override algorithm, compared to regimes that include such cases.
 
