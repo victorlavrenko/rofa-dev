@@ -169,6 +169,18 @@ uncertainty indicators suggest the leader is unreliable.
 \section{Experimental Setup}
 \label{sec:setup}
 
+We evaluate a single open-weight, instruction-tuned Llama 3.1 family checkpoint,
+\texttt{HPAI-BSC/Llama3.1-Aloe-Beta-8B}, which has 8B parameters and is run in full
+precision (bfloat16, no quantization). The model is accessed via the Hugging Face
+checkpoint and used with its chat template.
+
+Our evaluation set is drawn from MedMCQA \parencite{pal2022medmcqa}
+(\texttt{openlifescienceai/medmcqa}) using the official validation split. We
+filter to single-choice questions with explanation length between 20 and 500
+characters, then shuffle with seed 42 and select 400 questions with a per-subject
+cap of 23 (20-subject balancing). This yields a deterministic 400-question
+evaluation set.
+
 For each question, we generate:
 \begin{itemize}
   \item a greedy prediction using deterministic decoding; and
@@ -188,7 +200,8 @@ Let $a_{i,j}$ denote the final answer of branch $j$ for question $i$. From the e
     \]
 \end{itemize}
 
-All results are computed over 400 questions using a fixed prompt and model configuration.
+All results are computed over this fixed 400-question evaluation set using a
+single prompt and the model configuration above.
 
 \section{Hypotheses and Empirical Tests}
 
@@ -298,7 +311,12 @@ Second, we measured the required false-override suppression, defined as the rati
 
 The analysis reveals a sharp, regime-dependent trade-off. Broad regimes that include high-consensus predictions offer larger theoretical gains but require extremely high leader override precision, making them practically infeasible. In contrast, more conservative regimes focused on high-uncertainty cases---where top-1 and top-2 receive comparable support---exhibit substantially more favorable error budgets. In these regimes, even moderately accurate leader override policies yield meaningful improvements while incurring limited risk.
 
-While the available evaluation set limits statistical power for fine-grained comparisons between neighboring regimes, the qualitative pattern persists within this dataset and sampling configuration. In particular, excluding high-consensus predictions (e.g., regimes with very high top-1 vote counts) leads to a statistically significant reduction in the precision required of a leader override algorithm, compared to regimes that include such cases.
+While the fixed 400-question evaluation set limits statistical power for
+fine-grained comparisons between neighboring regimes, the qualitative pattern
+persists within this dataset and sampling configuration. In particular, excluding
+high-consensus predictions (e.g., regimes with very high top-1 vote counts) leads
+to a statistically significant reduction in the precision required of a leader
+override algorithm, compared to regimes that include such cases.
 
 We observe that moving the upper bound on top-1 vote counts from high-consensus regimes to uncertainty-focused regimes yields a more than twofold reduction in required false-override suppression (from $\approx 2.4$ to $\approx 1.0$), a difference that is statistically significant ($p < 10^{-6}$).
 
@@ -366,6 +384,12 @@ reasoning as a distribution rather than a single trajectory.
 All experiments reported in this paper are fully reproducible.
 A public, versioned snapshot of the complete codebase is available at
 \url{https://github.com/victorlavrenko/rofa/tree/paper/from-answers-to-hypotheses-v1}.
+
+The experiments use the \texttt{HPAI-BSC/Llama3.1-Aloe-Beta-8B} checkpoint (Llama
+3.1 family, 8B parameters, instruction-tuned, open-weight, bfloat16) and the
+MedMCQA validation split \parencite{pal2022medmcqa}
+(\texttt{openlifescienceai/medmcqa}) with the deterministic 400-question selection
+described in Section~\ref{sec:setup}.
 
 Reproduction is supported by two dedicated notebooks:
 
