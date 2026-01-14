@@ -31,7 +31,8 @@ def _scale_bubble_sizes(baseline_wrong: Iterable[float]) -> pd.Series:
     if median <= 0:
         median = 1.0
     sizes = (sizes / median) * 450.0
-    sizes = sizes.clip(lower=120.0, upper=1800.0)
+    sizes = sizes * 1.4
+    sizes = sizes.clip(lower=160.0, upper=2400.0)
     return sizes
 
 
@@ -41,6 +42,7 @@ def plot_top2_flip_feasibility(
     total_n: int = 400,
     *,
     use_frontier_df: Optional[pd.DataFrame] = None,
+    save_path: Optional[str] = "top2_flip_feasibility.png",
 ) -> Tuple[plt.Figure, plt.Axes, pd.DataFrame]:
     """Plot selective top-2 flip feasibility for regime rectangles.
 
@@ -103,12 +105,15 @@ def plot_top2_flip_feasibility(
     )
     ax.axhline(1.0, linestyle="--", linewidth=1, color="gray")
 
-    for row in plot_df.itertuples(index=False):
+    for row, bubble_size in zip(plot_df.itertuples(index=False), bubble_sizes):
+        bubble_radius = (float(bubble_size) ** 0.5) / 2.0
+        offset_x = -(bubble_radius + 6.0)
         ax.annotate(
             row.label,
             (row.oracle_overall_acc, row.required_fp_suppression),
             textcoords="offset points",
-            xytext=(6, 6),
+            xytext=(offset_x, 6),
+            ha="right",
             fontsize=8,
         )
 
@@ -117,6 +122,8 @@ def plot_top2_flip_feasibility(
     ax.set_ylabel("Required FP suppression (X / Y)")
     ax.legend(loc="best")
     fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=300, bbox_inches="tight")
 
     table_cols = [
         "top1_votes_min",
