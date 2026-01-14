@@ -112,13 +112,9 @@ def plot_top2_flip_feasibility(
             fontsize=8,
         )
 
-    ax.set_title(
-        "Regime-level flip feasibility: achievable accuracy vs required false-flip suppression"
-    )
-    ax.set_xlabel(
-        "Oracle overall accuracy if an ideal top-2 oracle corrects all top2==gold cases in the regime"
-    )
-    ax.set_ylabel("Required FP suppression X/Y (top1_correct / top2_correct)")
+    ax.set_title("Achievable accuracy vs required false-flip suppression")
+    ax.set_xlabel("Oracle overall accuracy (ideal top-2 flip)")
+    ax.set_ylabel("Required FP suppression (X / Y)")
     ax.legend(loc="best")
     fig.tight_layout()
 
