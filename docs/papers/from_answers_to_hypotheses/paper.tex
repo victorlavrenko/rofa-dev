@@ -170,16 +170,20 @@ uncertainty indicators suggest the leader is unreliable.
 \label{sec:setup}
 
 We evaluate a single open-weight, instruction-tuned Llama 3.1 family checkpoint,
-\texttt{HPAI-BSC/Llama3.1-Aloe-Beta-8B}, which has 8B parameters and is run in full
+\href{https://huggingface.co/HPAI-BSC/Llama3.1-Aloe-Beta-8B}
+{\nolinkurl{HPAI-BSC/Llama3.1-Aloe-Beta-8B}}, which has 8B parameters and is run in full
 precision (bfloat16, no quantization). The model is accessed via the Hugging Face
 checkpoint and used with its chat template.
 
 Our evaluation set is drawn from MedMCQA \parencite{pal2022medmcqa}
-(\texttt{openlifescienceai/medmcqa}) using the official validation split. We
+(\href{https://huggingface.co/datasets/openlifescienceai/medmcqa}
+{\nolinkurl{openlifescienceai/medmcqa}}) using the official validation split. We
 filter to single-choice questions with explanation length between 20 and 500
-characters, then shuffle with seed 42 and select 400 questions with a per-subject
-cap of 23 (20-subject balancing). This yields a deterministic 400-question
-evaluation set.
+characters, then shuffle with seed 42 and select 400 questions while enforcing a
+per-subject cap of 23 to prevent over-representation of subjects with very large
+question pools (e.g., dentistry). MedMCQA contains 20 subject areas, and this
+procedure yields a roughly balanced evaluation set across subjects. This yields
+a deterministic 400-question evaluation set.
 
 For each question, we generate:
 \begin{itemize}
@@ -330,13 +334,16 @@ Importantly, this perspective reframes leader override not as a binary operation
 
 \subsection{Errors of Hypothesis Space}
 
-The failure to find evidence supporting H3 motivates an alternative, empirically grounded interpretation for these errors:
+The failure to find evidence supporting H3 motivates an alternative \emph{interpretive explanation} for these errors, consistent with the observed behavior but not yet empirically isolated as a distinct mechanism.
 
-\paragraph{H3$'$.\ }Some errors arise because the correct hypothesis is poorly represented or absent from the model's hypothesis space.
+\paragraph{Interpretive hypothesis (H3$'$).}
+One plausible interpretation is that some errors arise because the correct hypothesis is poorly represented or effectively absent from the model’s hypothesis space.
 
-Under this view, unanimous but incorrect predictions correspond to cases where the model's hypothesis space is locally coherent but globally misaligned with the task. This interpretation is not yet formally isolated from selection effects; the current analysis does not provide an operational test to conclusively separate missing hypotheses from low-probability selection. Such errors are therefore not reducible to stochastic selection noise alone and cannot be remedied by increased sampling or voting alone.
+Under this view, unanimous but incorrect predictions correspond to cases where the model’s hypothesis space is locally coherent—yielding strong internal agreement—yet globally misaligned with the task. Importantly, the present analysis does not provide an operational test that cleanly separates missing hypotheses from low-probability selection among existing alternatives. We therefore do not claim to isolate this mechanism empirically.
 
-In such cases, increased sampling or stronger aggregation cannot recover the correct answer. This reframes aggregation as a \emph{diagnostic probe} rather than a solution.
+Nevertheless, the observed behavior is inconsistent with an explanation based solely on stochastic selection noise. In these cases, increased sampling or stronger aggregation fails to recover the correct answer, suggesting a qualitative limitation of hypothesis representation rather than insufficient exploration.
+
+This reframes aggregation not as a remedy for such errors, but as a \emph{diagnostic probe}: a means of revealing when internal coherence reflects confidence without correctness.
 
 Taken together, our results suggest three qualitatively distinct failure modes in LLM reasoning:
 \begin{enumerate}
@@ -367,8 +374,7 @@ possibility of hypothesis-space errors (H3$'$), though we do not yet isolate tha
 mechanism empirically. We also found partial support for H4: selective leader
 override appears feasible in low-consensus regimes with favorable error budgets,
 but the evidence is limited to the single dataset, model, and sampling configuration
-tested here. Together, these results underscore the analytical value of treating
-reasoning as a distribution rather than a single trajectory.
+tested here. Together, these results underscore that benchmark accuracy can obscure qualitatively distinct failure modes that cannot be addressed by aggregation alone, calling for a distributional view of reasoning rather than reliance on a single trajectory.
 
 \section{Future Work}
 
@@ -385,11 +391,10 @@ All experiments reported in this paper are fully reproducible.
 A public, versioned snapshot of the complete codebase is available at
 \url{https://github.com/victorlavrenko/rofa/tree/paper/from-answers-to-hypotheses-v1}.
 
-The experiments use the \texttt{HPAI-BSC/Llama3.1-Aloe-Beta-8B} checkpoint (Llama
-3.1 family, 8B parameters, instruction-tuned, open-weight, bfloat16) and the
-MedMCQA validation split \parencite{pal2022medmcqa}
-(\texttt{openlifescienceai/medmcqa}) with the deterministic 400-question selection
-described in Section~\ref{sec:setup}.
+All results were obtained using the fixed model, dataset, prompt, and sampling
+configuration described in
+\hyperref[sec:setup]{Section~3}, evaluated on a deterministic 400-question subset
+of the MedMCQA validation split.
 
 Reproduction is supported by two dedicated notebooks:
 
