@@ -31,7 +31,7 @@ def _scale_bubble_sizes(baseline_wrong: Iterable[float]) -> pd.Series:
     if median <= 0:
         median = 1.0
     sizes = (sizes / median) * 450.0
-    sizes = sizes * 1.4
+    sizes = sizes * 3
     sizes = sizes.clip(lower=160.0, upper=2400.0)
     return sizes
 
@@ -107,12 +107,12 @@ def plot_top2_flip_feasibility(
 
     for row, bubble_size in zip(plot_df.itertuples(index=False), bubble_sizes):
         bubble_radius = (float(bubble_size) ** 0.5) / 2.0
-        offset_x = -(bubble_radius + 6.0)
+        offset_x = -(bubble_radius + 3.0)
         ax.annotate(
             row.label,
             (row.oracle_overall_acc, row.required_fp_suppression),
             textcoords="offset points",
-            xytext=(offset_x, 6),
+            xytext=(offset_x, -7),
             ha="right",
             fontsize=8,
         )

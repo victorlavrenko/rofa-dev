@@ -228,7 +228,10 @@ Figure~\ref{fig:consensus} illustrates how accuracy varies with internal consens
   \fbox{\parbox[c][0.25\textheight][c]{0.45\textwidth}{\centering Missing figure: \texttt{figure1\_max\_frac\_exact.png}}}%
 }
 \captionsetup{width=0.6\textwidth}
-\caption{Accuracy as a function of internal consensus (max\_frac). Even near-unanimous cases exhibit non-zero error rates.}\label{fig:consensus}
+\caption{
+Accuracy as a function of internal consensus (max\_frac).
+Higher branch agreement correlates with higher accuracy, but even near-unanimous predictions exhibit a non-zero error rate.
+}\label{fig:consensus}
 \end{figure}
 
 This behavior is inconsistent with the assumption that confidence or agreement can serve as a sufficient decision criterion.
@@ -263,12 +266,54 @@ Importantly, only the first class is addressable through improved selection or a
 
 \section{Implications and Future Work}
 
-These results suggest that safe deployment of LLMs in medicine requires decision rules that operate on \emph{sets of hypotheses}, not single answers. Future work should focus on:
+The analysis presented in this work suggests that improving LLM performance in high-stakes medical settings is not primarily a matter of producing a single more accurate answer, but of reasoning over structured sets of competing hypotheses. In particular, the presence of meaningful top-2 coverage opens a path toward correcting errors, but only under carefully constrained decision regimes.
+
+\subsection{Limits of naive top-2 flipping}
+
+A natural first idea is to flip predictions from the most frequent answer (top-1) to the second-most frequent answer (top-2) whenever uncertainty is detected. However, our results show that such naive flipping is generally unsafe. In regimes with strong consensus, correct top-1 predictions vastly outnumber correct top-2 predictions. As a result, even a small rate of incorrect flips would outweigh any potential benefit. This imbalance is statistically significant in our data (binomial test, $p < 10^{-6}$ for high-consensus regimes), demonstrating that indiscriminate flipping would almost certainly degrade overall accuracy.
+
+These findings indicate that top-2 coverage alone is insufficient: the feasibility of flipping depends critically on the relative frequencies of correct top-1 and top-2 hypotheses within a given uncertainty regime.
+
+\subsection{Flip feasibility and error budgets across uncertainty regimes}
+
+To make this trade-off explicit, we analyzed the feasibility of selective top-2 flipping across vote-consensus regimes defined by top-1 vote counts and top-1/top-2 gaps. For each regime, we quantified two key quantities (Figure~\ref{fig:flip-feasibility}).
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figure2_top2_flip_feasibility}
+    \caption{
+    Feasibility of selective top-2 flipping across vote-consensus regimes.
+    The x-axis shows the maximum overall accuracy achievable by an ideal oracle that corrects all top-2=gold cases within a regime.
+    The y-axis indicates the required suppression of false flips (top-1 correct vs.\ top-2 correct).
+    Bubble size reflects the number of baseline errors covered by the regime.
+    }\label{fig:flip-feasibility}
+\end{figure}
+
+First, we computed the maximum achievable overall accuracy under an idealized oracle that flips all cases where the second-most frequent hypothesis is correct (top-2 = gold) and never introduces new errors. This represents a strict upper bound, since errors outside top-2 coverage cannot be corrected by flipping.
+
+Second, we measured the required suppression of false flips, defined as the ratio between cases where the top-1 hypothesis is correct and cases where the top-2 hypothesis is correct within the regime. This ratio directly reflects how accurate a flip decision policy must be in order to avoid degrading performance.
+
+The analysis reveals a sharp, regime-dependent trade-off. Broad regimes that include high-consensus predictions offer larger theoretical gains but require extremely high flip precision, making them practically infeasible. In contrast, more conservative regimes focused on high-uncertainty cases—where top-1 and top-2 receive comparable support—exhibit substantially more favorable error budgets. In these regimes, even moderately accurate flip policies could yield meaningful improvements while incurring limited risk.
+
+While the available evaluation set limits statistical power for fine-grained comparisons between neighboring regimes, the qualitative pattern is robust. In particular, excluding high-consensus predictions (e.g., regimes with very high top-1 vote counts) leads to a statistically significant reduction in the precision required of a flip algorithm, compared to regimes that include such cases.
+
+We observe that moving the upper bound on top-1 vote counts from high-consensus regimes to uncertainty-focused regimes yields a more than twofold reduction in required false-flip suppression (from $\approx 2.4$ to $\approx 1.0$), a difference that is statistically significant ($p < 10^{-6}$).
+
+\subsection{Implications for future flip algorithms}
+
+These findings suggest a staged and risk-aware strategy for future work. Rather than attempting to correct all errors, flip algorithms should initially target regimes with high uncertainty and favorable error budgets, where the cost of a mistaken flip is relatively low and the likelihood of successful correction is higher. As decision accuracy improves, such algorithms could progressively expand into more challenging regimes.
+
+Importantly, this perspective reframes flipping not as a binary operation applied globally, but as a selective intervention governed by explicit uncertainty thresholds and error budgets. Even conservative strategies restricted to high-uncertainty regimes can already produce substantial gains, without requiring near-perfect flip decisions.
+
+Future research should therefore focus on:
 \begin{itemize}
-  \item explicit modeling of hypothesis spaces;
+  \item explicit modeling of hypothesis sets and vote distributions rather than single predictions;
+  \item learning flip decision policies that operate within predefined error budgets;
   \item training objectives that penalize confident convergence on incorrect hypotheses; and
-  \item interfaces that expose structured uncertainty to clinicians.
+  \item interfaces that expose structured uncertainty and alternative hypotheses to clinicians.
 \end{itemize}
+
+Taken together, these results highlight that safe and effective deployment of LLMs in medicine depends not only on accuracy, but on principled control of when and how model uncertainty is resolved.
 
 \section*{Reproducibility and Code Availability}
 
