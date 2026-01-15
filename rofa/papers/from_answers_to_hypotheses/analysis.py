@@ -350,6 +350,95 @@ def compute_table_top2(df_branches: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame({"metric": ["top2_coverage"], "value": [top2_coverage(df_branches)]})
 
 
+def _ranked_top_k(preds: Sequence[Optional[str]], k: int = 2) -> List[str]:
+    valid = [
+        pred
+        for pred in preds
+        if isinstance(pred, str) and pred.strip() and not pd.isna(pred)
+    ]
+    if not valid:
+        return []
+    first_idx: Dict[str, int] = {}
+    for i, pred in enumerate(preds):
+        if not isinstance(pred, str) or not pred.strip() or pd.isna(pred):
+            continue
+        if pred not in first_idx:
+            first_idx[pred] = i
+    counts = Counter(valid)
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], first_idx[kv[0]]))
+    return [label for label, _ in ranked[:k]]
+
+
+def failure_mode_breakdown(
+    df_branches: pd.DataFrame,
+    top_k: int = 2,
+    near_threshold: float = 0.9,
+) -> Dict[str, float | int]:
+    """Compute failure-mode stats for selection vs unsurfaced errors and unanimity."""
+    required_cols = {"gold", "leader_correct", "max_frac", "branch_preds"}
+    missing = required_cols - set(df_branches.columns)
+    if missing:
+        raise ValueError(f"DataFrame does not contain required columns: {missing}")
+
+    gold_series = cast(pd.Series, df_branches["gold"])
+    branch_series = cast(pd.Series, df_branches["branch_preds"])
+    leader_correct = cast(pd.Series, df_branches["leader_correct"]).fillna(False).astype(bool)
+    leader_wrong = ~leader_correct
+
+    gold_in_topk = [
+        gold in _ranked_top_k(preds, k=top_k) if isinstance(gold, str) else False
+        for preds, gold in zip(branch_series, gold_series, strict=False)
+    ]
+
+    n_total = len(df_branches)
+    n_errors = int(leader_wrong.sum())
+    selection_mask = leader_wrong & pd.Series(gold_in_topk, index=df_branches.index)
+    unsurfaced_mask = leader_wrong & ~pd.Series(gold_in_topk, index=df_branches.index)
+
+    sel_n = int(selection_mask.sum())
+    uns_n = int(unsurfaced_mask.sum())
+
+    def _pct(num: int, denom: int) -> float:
+        return 0.0 if denom == 0 else 100.0 * num / denom
+
+    sel_total_pct = _pct(sel_n, n_total)
+    sel_error_pct = _pct(sel_n, n_errors)
+    uns_total_pct = _pct(uns_n, n_total)
+    uns_error_pct = _pct(uns_n, n_errors)
+
+    max_frac = cast(pd.Series, df_branches["max_frac"]).fillna(0.0)
+    unanimous_mask = max_frac == 1.0
+    unanim_n = int(unanimous_mask.sum())
+    unanim_wrong_n = int((unanimous_mask & leader_wrong).sum())
+    unanim_wrong_pct = _pct(unanim_wrong_n, unanim_n)
+    unanim_acc_pct = 100.0 - unanim_wrong_pct if unanim_n else 0.0
+    unanim_share_errors_pct = _pct(unanim_wrong_n, n_errors)
+
+    near_mask = max_frac >= near_threshold
+    near_n = int(near_mask.sum())
+    near_wrong_n = int((near_mask & leader_wrong).sum())
+    near_wrong_pct = _pct(near_wrong_n, near_n)
+
+    return {
+        "n_total": n_total,
+        "n_errors": n_errors,
+        "selection_errors": sel_n,
+        "selection_total_pct": sel_total_pct,
+        "selection_error_pct": sel_error_pct,
+        "unsurfaced_errors": uns_n,
+        "unsurfaced_total_pct": uns_total_pct,
+        "unsurfaced_error_pct": uns_error_pct,
+        "unanimous_n": unanim_n,
+        "unanimous_wrong_n": unanim_wrong_n,
+        "unanimous_wrong_pct": unanim_wrong_pct,
+        "unanimous_acc_pct": unanim_acc_pct,
+        "unanimous_error_pct": unanim_share_errors_pct,
+        "near_unanimous_n": near_n,
+        "near_unanimous_wrong_n": near_wrong_n,
+        "near_unanimous_wrong_pct": near_wrong_pct,
+    }
+
+
 @dataclass(frozen=True)
 class VotePatternSpec:
     """Configuration for synthetic vote-pattern examples."""

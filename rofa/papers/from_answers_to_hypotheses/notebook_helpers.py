@@ -161,3 +161,27 @@ def subject_breakdown(df_greedy: pd.DataFrame, df_branches: pd.DataFrame) -> pd.
             "leader_accuracy": df_subject_branches,
         }
     )
+
+
+def failure_mode_table(stats: Dict[str, float | int]) -> pd.DataFrame:
+    """Format failure-mode stats into a single-row DataFrame."""
+    return pd.DataFrame(
+        {
+            "n_total": [stats["n_total"]],
+            "n_errors": [stats["n_errors"]],
+            "selection_errors": [stats["selection_errors"]],
+            "selection_total_pct": [stats["selection_total_pct"]],
+            "selection_error_pct": [stats["selection_error_pct"]],
+            "unsurfaced_errors": [stats["unsurfaced_errors"]],
+            "unsurfaced_total_pct": [stats["unsurfaced_total_pct"]],
+            "unsurfaced_error_pct": [stats["unsurfaced_error_pct"]],
+            "unanimous_n": [stats["unanimous_n"]],
+            "unanimous_wrong_n": [stats["unanimous_wrong_n"]],
+            "unanimous_wrong_pct": [stats["unanimous_wrong_pct"]],
+            "unanimous_acc_pct": [stats["unanimous_acc_pct"]],
+            "unanimous_error_pct": [stats["unanimous_error_pct"]],
+            "near_unanimous_n": [stats["near_unanimous_n"]],
+            "near_unanimous_wrong_n": [stats["near_unanimous_wrong_n"]],
+            "near_unanimous_wrong_pct": [stats["near_unanimous_wrong_pct"]],
+        }
+    )
