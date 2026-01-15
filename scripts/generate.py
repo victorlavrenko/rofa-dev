@@ -27,6 +27,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Resume from existing progress.json when available.",
     )
+    parser.add_argument(
+        "--expand",
+        action="store_true",
+        help="Expand an existing question set to the new --n without redoing prior examples.",
+    )
     parser.add_argument("--question-set", dest="question_set_path")
     parser.add_argument("--create-question-set", action="store_true")
     parser.add_argument("--question-set-out", "--out", dest="question_set_out")
@@ -127,6 +132,7 @@ def main() -> None:
         out_dir=args.out_dir,
         run_id=args.run_id,
         resume=args.resume,
+        expand=args.expand,
         seed=args.seed,
         max_new_tokens=args.max_new_tokens,
         n=args.n,

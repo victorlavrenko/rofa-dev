@@ -12,7 +12,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from .schemas import RunManifest
+from .schemas import RunConfig, RunManifest
 
 
 def _now_utc() -> str:
@@ -53,6 +53,22 @@ def write_manifest(path: str, manifest: RunManifest) -> None:
     """
     payload = asdict(manifest)
     _atomic_write_json(path, payload)
+
+
+def load_manifest(path: str) -> Optional[RunManifest]:
+    """Load a run manifest if it exists."""
+    if not os.path.exists(path):
+        return None
+    with open(path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+    config = RunConfig(**payload["config"])
+    return RunManifest(
+        run_id=payload["run_id"],
+        created_at=payload["created_at"],
+        method=payload["method"],
+        config=config,
+        notes=payload.get("notes"),
+    )
 
 
 def write_progress(path: str, payload: Dict[str, Any]) -> None:
