@@ -145,7 +145,6 @@ def main() -> None:
         top_p=args.top_p if method_key != "greedy" else None,
         top_k=args.top_k if method_key != "greedy" else None,
         progress=True,
-        heartbeat_every=10,
         write_full_records=write_full_records,
         tokenizer=tokenizer,
         model=model,
