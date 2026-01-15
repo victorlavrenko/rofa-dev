@@ -49,7 +49,6 @@ def _update_progress_bar(
     completed: int,
     total: int,
     start_time: float,
-    heartbeat: Optional[str] = None,
 ) -> None:
     """Update the tqdm progress bar with elapsed time and ETA."""
     elapsed = time.time() - start_time
@@ -63,8 +62,6 @@ def _update_progress_bar(
             "ex/s": f"{ex_per_sec:0.2f}",
         }
     )
-    if heartbeat:
-        bar.write(heartbeat)
 
 
 def _resolve_run_paths(config: GenerationConfig) -> Dict[str, str]:
@@ -363,15 +360,11 @@ def run_generation(config: GenerationConfig) -> Dict[str, Any]:
 
         if bar:
             bar.update(1)
-            heartbeat = None
-            if config.heartbeat_every and completed_since_start % config.heartbeat_every == 0:
-                heartbeat = f"heartbeat: summary_written={summary_written}"
             _update_progress_bar(
                 bar,
                 completed=completed_since_start,
                 total=segment_total,
                 start_time=start_time,
-                heartbeat=heartbeat,
             )
 
     if bar:

@@ -48,7 +48,6 @@ class GenerationConfig:
     top_p: Optional[float] = None
     top_k: Optional[int] = None
     progress: bool = False
-    heartbeat_every: int = 10
     write_full_records: bool = False
     tokenizer: Optional[Any] = None
     model: Optional[Any] = None
