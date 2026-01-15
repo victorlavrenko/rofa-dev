@@ -1,3 +1,13 @@
-*.ipynb filter=nbstripout
-*.zpln filter=nbstripout
-*.ipynb diff=ipynb
+# Normalize all text files to LF in the repository
+* text=auto eol=lf
+
+# Jupyter notebooks (JSON) are text; keep nbstripout filter
+*.ipynb text eol=lf filter=nbstripout
+
+# Common binaries (never normalize)
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.pdf  binary
+*.gif  binary
+*.webp binary
