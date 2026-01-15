@@ -155,6 +155,7 @@ def _ensure_manifest(
         updated_config = RunConfig(
             method=config.method,
             model_id=config.model_id,
+            model_slug=config.model_slug,
             seed=config.seed,
             max_new_tokens=config.max_new_tokens,
             n=config.n,
@@ -180,6 +181,7 @@ def _ensure_manifest(
     run_config = RunConfig(
         method=config.method,
         model_id=config.model_id,
+        model_slug=config.model_slug,
         seed=config.seed,
         max_new_tokens=config.max_new_tokens,
         n=config.n,
@@ -330,6 +332,12 @@ def run_generation(config: GenerationConfig) -> Dict[str, Any]:
             "picked_index": idx + 1,
             "subject_name": subj,
             "gold": cop_to_letter(ex["cop"]),
+            "model_id": config.model_id,
+            "model_slug": config.model_slug,
+            "temperature": config.temperature,
+            "top_p": config.top_p,
+            "top_k": config.top_k,
+            "n_branches": config.n_branches,
         }
 
         record = config.method_impl.run_one(ex, context)

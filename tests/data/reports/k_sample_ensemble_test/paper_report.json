@@ -9,5 +9,15 @@
     "count": 6,
     "accuracy": 0.5
   },
-  "top2_coverage": 0.6
+  "top2_coverage": 0.6,
+  "model_id": "HPAI-BSC/Llama3.1-Aloe-Beta-8B",
+  "model_slug": "hpai-bsc__llama3.1-aloe-beta-8b",
+  "decoding_params": {
+    "seed": 42,
+    "max_new_tokens": 1024,
+    "temperature": 0.8,
+    "top_p": 0.8,
+    "top_k": 50,
+    "n_branches": 10
+  }
 }

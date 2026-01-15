@@ -24,6 +24,7 @@ class RunConfig:
     top_p: Optional[float] = None
     top_k: Optional[int] = None
     question_set_id: Optional[str] = None
+    model_slug: Optional[str] = None
 
 
 @dataclass
@@ -33,6 +34,7 @@ class GenerationConfig:
     method: str
     model_id: str
     out_dir: str
+    model_slug: Optional[str] = None
     run_id: Optional[str] = None
     resume: Optional[bool] = None
     expand: bool = False

@@ -19,7 +19,8 @@ def _load_fixture_json(name: str) -> dict:
 
 def test_run_report_matches_fixture() -> None:
     df_summary = analysis.load_summary(str(FIXTURE_RUN_DIR))
-    report = analysis.run_report(df_summary)
+    run_metadata = analysis.load_run_metadata(str(FIXTURE_RUN_DIR))
+    report = analysis.run_report(df_summary, run_metadata=run_metadata)
     expected = _load_fixture_json("report.json")
     assert report == expected
 
@@ -63,7 +64,12 @@ def test_notebook_reports_match_fixtures(tmp_path: Path, monkeypatch) -> None:
     )
     df_subject_breakdown = notebook_helpers.subject_breakdown(df_greedy, df_branches)
 
-    metadata = {"resolved_runs": {"k_sample_ensemble": str(FIXTURE_RUN_DIR)}}
+    metadata = {
+        "resolved_runs": {"k_sample_ensemble": str(FIXTURE_RUN_DIR)},
+        "resolved_metadata": {
+            "k_sample_ensemble": analysis.load_run_metadata(str(FIXTURE_RUN_DIR))
+        },
+    }
 
     monkeypatch.chdir(tmp_path)
     report_dir = notebook_helpers.export_paper_reports(

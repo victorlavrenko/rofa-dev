@@ -12,6 +12,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+from .model_id import to_slug
 from .schemas import RunConfig, RunManifest
 
 
@@ -61,7 +62,12 @@ def load_manifest(path: str) -> Optional[RunManifest]:
         return None
     with open(path, "r", encoding="utf-8") as f:
         payload = json.load(f)
-    config = RunConfig(**payload["config"])
+    config_payload = dict(payload["config"])
+    if "model_slug" not in config_payload or not config_payload.get("model_slug"):
+        model_id = config_payload.get("model_id")
+        if model_id:
+            config_payload["model_slug"] = to_slug(model_id)
+    config = RunConfig(**config_payload)
     return RunManifest(
         run_id=payload["run_id"],
         created_at=payload["created_at"],

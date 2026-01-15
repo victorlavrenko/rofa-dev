@@ -1,9 +1,9 @@
-subject_name,greedy_accuracy,leader_accuracy
-Anatomy,0.5,0.5
-Dental,1.0,1.0
-Forensic Medicine,0.0,0.0
-Microbiology,1.0,0.0
-Pediatrics,0.0,1.0
-Pharmacology,0.0,0.0
-Physiology,1.0,1.0
-Surgery,0.0,0.0
+subject_name,greedy_accuracy,leader_accuracy,model_id,model_slug,seed,max_new_tokens,temperature,top_p,top_k,n_branches
+Anatomy,0.5,0.5,HPAI-BSC/Llama3.1-Aloe-Beta-8B,hpai-bsc__llama3.1-aloe-beta-8b,42,1024,0.8,0.8,50,10
+Dental,1.0,1.0,HPAI-BSC/Llama3.1-Aloe-Beta-8B,hpai-bsc__llama3.1-aloe-beta-8b,42,1024,0.8,0.8,50,10
+Forensic Medicine,0.0,0.0,HPAI-BSC/Llama3.1-Aloe-Beta-8B,hpai-bsc__llama3.1-aloe-beta-8b,42,1024,0.8,0.8,50,10
+Microbiology,1.0,0.0,HPAI-BSC/Llama3.1-Aloe-Beta-8B,hpai-bsc__llama3.1-aloe-beta-8b,42,1024,0.8,0.8,50,10
+Pediatrics,0.0,1.0,HPAI-BSC/Llama3.1-Aloe-Beta-8B,hpai-bsc__llama3.1-aloe-beta-8b,42,1024,0.8,0.8,50,10
+Pharmacology,0.0,0.0,HPAI-BSC/Llama3.1-Aloe-Beta-8B,hpai-bsc__llama3.1-aloe-beta-8b,42,1024,0.8,0.8,50,10
+Physiology,1.0,1.0,HPAI-BSC/Llama3.1-Aloe-Beta-8B,hpai-bsc__llama3.1-aloe-beta-8b,42,1024,0.8,0.8,50,10
+Surgery,0.0,0.0,HPAI-BSC/Llama3.1-Aloe-Beta-8B,hpai-bsc__llama3.1-aloe-beta-8b,42,1024,0.8,0.8,50,10

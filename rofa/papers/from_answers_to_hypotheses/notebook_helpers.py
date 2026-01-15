@@ -117,6 +117,29 @@ def _resolve_report_dir(metadata: Dict[str, Any]) -> Path:
     return report_dir
 
 
+def _resolve_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    resolved = cast(Dict[str, Dict[str, Any]], metadata.get("resolved_metadata", {}))
+    return resolved.get("k_sample_ensemble") or resolved.get("greedy") or {}
+
+
+def _annotate_with_metadata(df: pd.DataFrame, run_metadata: Dict[str, Any]) -> pd.DataFrame:
+    if not run_metadata:
+        return df
+    metadata_cols = {
+        "model_id": run_metadata.get("model_id"),
+        "model_slug": run_metadata.get("model_slug"),
+        "seed": (run_metadata.get("decoding_params") or {}).get("seed"),
+        "max_new_tokens": (run_metadata.get("decoding_params") or {}).get("max_new_tokens"),
+        "temperature": (run_metadata.get("decoding_params") or {}).get("temperature"),
+        "top_p": (run_metadata.get("decoding_params") or {}).get("top_p"),
+        "top_k": (run_metadata.get("decoding_params") or {}).get("top_k"),
+        "n_branches": (run_metadata.get("decoding_params") or {}).get("n_branches"),
+    }
+    for key, value in metadata_cols.items():
+        df[key] = value
+    return df
+
+
 def export_paper_reports(
     metadata: Dict[str, Any],
     df_greedy_accuracy: pd.DataFrame,
@@ -129,6 +152,7 @@ def export_paper_reports(
     df_subject_breakdown: pd.DataFrame,
 ) -> Path:
     report_dir = _resolve_report_dir(metadata)
+    run_metadata = _resolve_metadata(metadata)
 
     def _cell_to_float(df: pd.DataFrame, column: str) -> float:
         return float(df.at[df.index[0], column])
@@ -140,13 +164,21 @@ def export_paper_reports(
         "near_unanimous": near_unanimous_stats,
         "top2_coverage": _cell_to_float(df_top2, "value"),
     }
+    if run_metadata:
+        paper_report.update(run_metadata)
     report_path = report_dir / "paper_report.json"
     with report_path.open("w", encoding="utf-8") as handle:
         json.dump(paper_report, handle, indent=2)
 
-    df_max_frac.to_csv(report_dir / "max_frac_distribution.csv", index=False)
-    df_rw_other.to_csv(report_dir / "rw_other_breakdown.csv")
-    df_subject_breakdown.to_csv(report_dir / "subject_accuracy.csv")
+    _annotate_with_metadata(df_max_frac, run_metadata).to_csv(
+        report_dir / "max_frac_distribution.csv", index=False
+    )
+    _annotate_with_metadata(df_rw_other, run_metadata).to_csv(
+        report_dir / "rw_other_breakdown.csv"
+    )
+    _annotate_with_metadata(df_subject_breakdown, run_metadata).to_csv(
+        report_dir / "subject_accuracy.csv"
+    )
     return report_dir
 
 

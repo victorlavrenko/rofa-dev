@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Protocol
 
 from rofa.core.io import _now_utc
 from rofa.core.metrics import _correct_fraction, _diversity_metrics
-from rofa.core.model import MODEL_ID, infer_one
+from rofa.core.model import infer_one
 from rofa.papers.from_answers_to_hypotheses.prompts import SYSTEM, build_user
 
 
@@ -31,6 +31,8 @@ class GreedyDecode:
         seed = context["seed"]
         index = context["index"]
         subject_name = context["subject_name"]
+        model_id = context["model_id"]
+        model_slug = context["model_slug"]
 
         pred, gold, gen, inference_time = infer_one(
             example,
@@ -57,7 +59,8 @@ class GreedyDecode:
             "model_output": gen,
             "subject_name": subject_name,
             "inference_time_sec": inference_time,
-            "model": MODEL_ID,
+            "model_id": model_id,
+            "model_slug": model_slug,
             "max_new_tokens": max_new_tokens,
             "seed": seed,
             "timestamp": _now_utc(),
@@ -83,6 +86,8 @@ class BranchSamplingEnsemble:
         index = context["index"]
         picked_index = context["picked_index"]
         subject_name = context["subject_name"]
+        model_id = context["model_id"]
+        model_slug = context["model_slug"]
 
         gold = context["gold"]
 
@@ -165,9 +170,14 @@ class BranchSamplingEnsemble:
             },
             "gold": gold,
             "subject_name": subject_name,
-            "model": MODEL_ID,
+            "model_id": model_id,
+            "model_slug": model_slug,
             "max_new_tokens": max_new_tokens,
             "seed": seed,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "top_k": self.top_k,
+            "n_branches": self.n_branches,
             "timestamp": _now_utc(),
             "branches": branch_records,
             "branch_preds": preds,
@@ -197,5 +207,13 @@ class BranchSamplingEnsemble:
             "leader_correct": leader_correct,
             "class": class_label,
             "subject_name": subject_name,
+            "model_id": model_id,
+            "model_slug": model_slug,
+            "max_new_tokens": max_new_tokens,
+            "seed": seed,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "top_k": self.top_k,
+            "n_branches": self.n_branches,
             "timestamp": _now_utc(),
         }
