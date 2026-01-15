@@ -9,10 +9,11 @@ from typing import Any, Dict, Optional
 
 from tqdm import tqdm
 
-from .io import _append_jsonl, _now_utc, load_progress, write_manifest, write_progress
+from .io import _append_jsonl, _now_utc, load_manifest, load_progress, write_manifest, write_progress
 from .parse import cop_to_letter
 from .question_set import (
     create_question_set,
+    expand_question_set,
     load_filtered_dataset,
     load_question_set,
     question_hash,
@@ -122,6 +123,17 @@ def _load_or_create_question_set(
     else:
         qs = create_question_set(dataset_cfg, selection_cfg)
         save_question_set(qs, question_set_path)
+    if config.expand:
+        if qs.selection.get("seed") != selection_cfg["seed"]:
+            raise ValueError("Seed mismatch between config and question set.")
+        if qs.selection.get("subjects") != selection_cfg["subjects"]:
+            raise ValueError("Subjects mismatch between config and question set.")
+        expand_cfg = dict(selection_cfg)
+        expand_cfg["max_per_subject"] = qs.selection.get(
+            "max_per_subject", selection_cfg["max_per_subject"]
+        )
+        qs = expand_question_set(qs, dataset_cfg, expand_cfg)
+        save_question_set(qs, question_set_path)
     if config.question_set_path and os.path.exists(question_set_path):
         loaded_qs = load_question_set(question_set_path)
         if loaded_qs.qs_id != qs.qs_id:
@@ -138,6 +150,35 @@ def _ensure_manifest(
     selection_cfg: Dict[str, Any],
 ) -> None:
     if os.path.exists(manifest_path):
+        if not config.expand:
+            return
+        manifest = load_manifest(manifest_path)
+        if manifest is None:
+            return
+        updated_config = RunConfig(
+            method=config.method,
+            model_id=config.model_id,
+            seed=config.seed,
+            max_new_tokens=config.max_new_tokens,
+            n=config.n,
+            subjects=config.subjects,
+            max_per_subject=selection_cfg["max_per_subject"],
+            dataset_name=config.dataset_name,
+            dataset_split=config.dataset_split,
+            n_branches=config.n_branches,
+            temperature=config.temperature,
+            top_p=config.top_p,
+            top_k=config.top_k,
+            question_set_id=question_set_id,
+        )
+        updated_manifest = RunManifest(
+            run_id=manifest.run_id,
+            created_at=manifest.created_at,
+            method=config.method,
+            config=updated_config,
+            notes=manifest.notes,
+        )
+        write_manifest(manifest_path, updated_manifest)
         return
     run_config = RunConfig(
         method=config.method,
@@ -241,6 +282,10 @@ def run_generation(config: GenerationConfig) -> Dict[str, Any]:
         selection_cfg=selection_cfg,
         dataset_cfg=dataset_cfg,
     )
+    if config.expand:
+        selection_cfg["max_per_subject"] = qs.selection.get(
+            "max_per_subject", selection_cfg["max_per_subject"]
+        )
     _ensure_manifest(
         config,
         run_id=run_id,

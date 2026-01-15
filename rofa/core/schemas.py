@@ -35,6 +35,7 @@ class GenerationConfig:
     out_dir: str
     run_id: Optional[str] = None
     resume: Optional[bool] = None
+    expand: bool = False
     seed: int = 42
     max_new_tokens: int = 1024
     n: int = 100

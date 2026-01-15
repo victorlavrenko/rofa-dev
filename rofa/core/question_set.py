@@ -7,7 +7,7 @@ import json
 import random
 from collections import Counter
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from datasets import load_dataset
 
@@ -70,30 +70,7 @@ def _make_qs_id(payload: Dict[str, Any]) -> str:
     return hashlib.sha1(blob.encode("utf-8")).hexdigest()[:12]
 
 
-def create_question_set(dataset_cfg: Dict[str, Any], selection_cfg: Dict[str, Any]) -> QuestionSet:
-    """Create a deterministic question set.
-
-    Args:
-        dataset_cfg: Dataset name and split configuration.
-        selection_cfg: Selection settings (seed, n, subjects, max_per_subject).
-
-    Returns:
-        A QuestionSet with deterministic ordering and metadata.
-
-    Artifacts:
-        None (use :func:`save_question_set` to persist to disk).
-
-    Raises:
-        ValueError: If the dataset schema has drifted or selection criteria are invalid.
-
-    Notes:
-        The selection protocol (filters + subject balancing) is stable across papers;
-        paper-specific analyses should treat the generated question set as a fixed input.
-    """
-    dataset_name = dataset_cfg["dataset_name"]
-    dataset_split = dataset_cfg["dataset_split"]
-
-    ds = load_filtered_dataset(dataset_name, dataset_split)
+def _select_examples(ds, selection_cfg: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Counter]:
     indices = list(range(len(ds)))
     random.Random(selection_cfg["seed"]).shuffle(indices)
 
@@ -119,6 +96,36 @@ def create_question_set(dataset_cfg: Dict[str, Any], selection_cfg: Dict[str, An
         if len(examples) >= selection_cfg["n"]:
             break
 
+    return examples, subject_counts
+
+
+def create_question_set(dataset_cfg: Dict[str, Any], selection_cfg: Dict[str, Any]) -> QuestionSet:
+    """Create a deterministic question set.
+
+    Args:
+        dataset_cfg: Dataset name and split configuration.
+        selection_cfg: Selection settings (seed, n, subjects, max_per_subject).
+
+    Returns:
+        A QuestionSet with deterministic ordering and metadata.
+
+    Artifacts:
+        None (use :func:`save_question_set` to persist to disk).
+
+    Raises:
+        ValueError: If the dataset schema has drifted or selection criteria are invalid.
+
+    Notes:
+        The selection protocol (filters + subject balancing) is stable across papers;
+        paper-specific analyses should treat the generated question set as a fixed input.
+    """
+    dataset_name = dataset_cfg["dataset_name"]
+    dataset_split = dataset_cfg["dataset_split"]
+
+    ds = load_filtered_dataset(dataset_name, dataset_split)
+    examples, subject_counts = _select_examples(ds, selection_cfg)
+
+    max_per_subject = selection_cfg["max_per_subject"]
     selection = {
         "seed": selection_cfg["seed"],
         "n": selection_cfg["n"],
@@ -150,6 +157,70 @@ def create_question_set(dataset_cfg: Dict[str, Any], selection_cfg: Dict[str, An
         dataset_fingerprint=getattr(ds, "_fingerprint", None),
         selection=selection,
         examples=examples,
+    )
+
+
+def expand_question_set(
+    qs: QuestionSet,
+    dataset_cfg: Dict[str, Any],
+    selection_cfg: Dict[str, Any],
+) -> QuestionSet:
+    """Expand a question set to a larger ``n`` without reshuffling earlier examples."""
+    if selection_cfg["n"] <= len(qs.examples):
+        return qs
+
+    if qs.dataset_name != dataset_cfg["dataset_name"]:
+        raise ValueError("Dataset name mismatch when expanding question set.")
+    if qs.dataset_split != dataset_cfg["dataset_split"]:
+        raise ValueError("Dataset split mismatch when expanding question set.")
+
+    for key in ("seed", "subjects", "max_per_subject"):
+        if qs.selection.get(key) != selection_cfg.get(key):
+            raise ValueError(f"Selection mismatch on {key} when expanding question set.")
+
+    ds = load_filtered_dataset(dataset_cfg["dataset_name"], dataset_cfg["dataset_split"])
+    expanded_examples, subject_counts = _select_examples(ds, selection_cfg)
+    existing_len = len(qs.examples)
+
+    if len(expanded_examples) < existing_len:
+        raise ValueError("Expanded question set is shorter than existing examples.")
+
+    for old, new in zip(qs.examples, expanded_examples[:existing_len]):
+        if (
+            old.get("dataset_index") != new.get("dataset_index")
+            or old.get("id") != new.get("id")
+            or old.get("question_hash") != new.get("question_hash")
+        ):
+            raise ValueError("Existing question set does not match expanded selection.")
+
+    selection = dict(qs.selection)
+    selection.update(
+        {
+            "n": selection_cfg["n"],
+            "subjects": selection_cfg["subjects"],
+            "max_per_subject": selection_cfg["max_per_subject"],
+            "subject_counts": dict(subject_counts),
+        }
+    )
+
+    qs_payload = {
+        "dataset_name": dataset_cfg["dataset_name"],
+        "dataset_split": dataset_cfg["dataset_split"],
+        "selection": selection,
+        "examples": expanded_examples,
+    }
+    qs_id = _make_qs_id(qs_payload)
+
+    return QuestionSet(
+        qs_id=qs_id,
+        dataset_name=dataset_cfg["dataset_name"],
+        dataset_split=dataset_cfg["dataset_split"],
+        dataset_revision=str(getattr(ds.info, "version", None))
+        if ds.info is not None
+        else None,
+        dataset_fingerprint=getattr(ds, "_fingerprint", None),
+        selection=selection,
+        examples=expanded_examples,
     )
 
 
