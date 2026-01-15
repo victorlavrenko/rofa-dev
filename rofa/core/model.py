@@ -10,32 +10,33 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from .parse import cop_to_letter, extract_choice_letter
 
-MODEL_ID = "HPAI-BSC/Llama3.1-Aloe-Beta-8B"
+DEFAULT_MODEL_ID = "HPAI-BSC/Llama3.1-Aloe-Beta-8B"
 
 
-def load_tokenizer():
+def load_tokenizer(model_id: str, hf_token: Optional[str] = None):
     """Load the tokenizer for the model."""
-    return AutoTokenizer.from_pretrained(MODEL_ID, use_fast=True)
+    return AutoTokenizer.from_pretrained(model_id, use_fast=True, token=hf_token)
 
 
-def load_model(attn_impl: str):
+def load_model(model_id: str, attn_impl: str, hf_token: Optional[str] = None):
     """Load the model with the requested attention implementation."""
     return AutoModelForCausalLM.from_pretrained(
-        MODEL_ID,
+        model_id,
         dtype=torch.bfloat16,
         device_map={"": "cuda:0"},
         attn_implementation=attn_impl,  # "flash_attention_2" или "sdpa"
+        token=hf_token,
     ).eval()
 
 
-def load_model_with_fallback():
+def load_model_with_fallback(model_id: str, hf_token: Optional[str] = None):
     """Load the model, preferring FlashAttention2 and falling back to SDPA."""
     try:
-        model = load_model("flash_attention_2")
+        model = load_model(model_id, "flash_attention_2", hf_token=hf_token)
         attn_impl = "flash_attention_2"
     except Exception as exc:  # noqa: BLE001
         print("FlashAttention2 failed, falling back to SDPA:", repr(exc))
-        model = load_model("sdpa")
+        model = load_model(model_id, "sdpa", hf_token=hf_token)
         attn_impl = "sdpa"
     print("Using", "FlashAttention2" if attn_impl == "flash_attention_2" else "SDPA")
     print("attn_implementation in config:", getattr(model.config, "_attn_implementation", None))
@@ -90,12 +91,22 @@ def infer_one(
     if temperature is None:
         temperature = 1.0
 
+    user_prompt = build_user_prompt(example)
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": build_user_prompt(example)},
+        {"role": "user", "content": user_prompt},
     ]
 
-    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    prompt = None
+    if hasattr(tokenizer, "apply_chat_template"):
+        try:
+            prompt = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+        except Exception:  # noqa: BLE001
+            prompt = None
+    if prompt is None:
+        prompt = f"{system_prompt}\n\n{user_prompt}"
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
     if torch.cuda.is_available():

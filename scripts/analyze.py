@@ -77,7 +77,8 @@ def main() -> None:
             raise FileNotFoundError(f"summary.jsonl not found in {run_dir}")
 
         df_summary = paper_analysis.load_summary(run_dir)
-        report = paper_analysis.run_report(df_summary)
+        run_metadata = paper_analysis.load_run_metadata(run_dir)
+        report = paper_analysis.run_report(df_summary, run_metadata=run_metadata)
 
         print(json.dumps(report, indent=2, ensure_ascii=False))
 

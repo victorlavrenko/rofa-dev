@@ -11,7 +11,8 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple, cast
 
 import pandas as pd
 
-from rofa.core.io import unpack_zip
+from rofa.core.io import load_manifest, unpack_zip
+from rofa.core.model_id import to_slug
 from rofa.core.metrics import r_w_other_class
 from rofa.core.metrics import top2_coverage as metrics_top2_coverage
 
@@ -25,6 +26,58 @@ def load_summary(run_dir: str) -> pd.DataFrame:
     if not os.path.exists(summary_path):
         raise FileNotFoundError(f"summary.jsonl not found in {run_dir}")
     return pd.read_json(summary_path, lines=True)
+
+
+def _metadata_from_summary(df_summary: pd.DataFrame) -> Dict[str, object]:
+    metadata: Dict[str, object] = {}
+    if "model_id" in df_summary.columns:
+        model_id_series = df_summary["model_id"].dropna().astype(str)
+        if not model_id_series.empty:
+            model_id = model_id_series.iloc[0]
+            metadata["model_id"] = model_id
+            metadata["model_slug"] = to_slug(model_id)
+    if "model_slug" in df_summary.columns:
+        model_slug_series = df_summary["model_slug"].dropna().astype(str)
+        if not model_slug_series.empty:
+            metadata["model_slug"] = model_slug_series.iloc[0]
+    decoding_fields = [
+        "seed",
+        "max_new_tokens",
+        "temperature",
+        "top_p",
+        "top_k",
+        "n_branches",
+    ]
+    decoding = {
+        field: df_summary[field].dropna().iloc[0]
+        for field in decoding_fields
+        if field in df_summary.columns and not df_summary[field].dropna().empty
+    }
+    if decoding:
+        metadata["decoding_params"] = decoding
+    return metadata
+
+
+def load_run_metadata(run_dir: str) -> Dict[str, object]:
+    manifest_path = os.path.join(run_dir, "manifest.json")
+    manifest = load_manifest(manifest_path)
+    if manifest is None:
+        return {}
+    config = manifest.config
+    model_slug = config.model_slug or to_slug(config.model_id)
+    decoding = {
+        "seed": config.seed,
+        "max_new_tokens": config.max_new_tokens,
+        "temperature": config.temperature,
+        "top_p": config.top_p,
+        "top_k": config.top_k,
+        "n_branches": config.n_branches,
+    }
+    return {
+        "model_id": config.model_id,
+        "model_slug": model_slug,
+        "decoding_params": decoding,
+    }
 
 
 def resolve_run_dir(run_dir_or_zip: str) -> Tuple[str, bool]:
@@ -56,6 +109,7 @@ def load_paper_runs(
     df_branches: Optional[pd.DataFrame] = None
     resolved_runs: Dict[str, str] = {}
     temp_paths: List[str] = []
+    resolved_metadata: Dict[str, Dict[str, object]] = {}
 
     for run_dir_or_zip in run_dirs_or_zips:
         run_dir, is_temp = resolve_run_dir(run_dir_or_zip)
@@ -65,8 +119,9 @@ def load_paper_runs(
         manifest_path = os.path.join(run_dir, "manifest.json")
         method = None
         if os.path.exists(manifest_path):
-            manifest = pd.read_json(manifest_path, typ="series")
-            method = manifest.get("method")
+            manifest = load_manifest(manifest_path)
+            if manifest is not None:
+                method = manifest.method
         summary_df = load_summary(run_dir)
         if method is None:
             method = METHOD_K_SAMPLE if "branch_preds" in summary_df.columns else METHOD_GREEDY
@@ -74,9 +129,15 @@ def load_paper_runs(
         if method == METHOD_GREEDY:
             df_greedy = summary_df
             resolved_runs["greedy"] = run_dir
+            resolved_metadata["greedy"] = (
+                load_run_metadata(run_dir) if os.path.exists(manifest_path) else {}
+            )
         elif method in {METHOD_K_SAMPLE, "branches"}:
             df_branches = summary_df
             resolved_runs["k_sample_ensemble"] = run_dir
+            resolved_metadata["k_sample_ensemble"] = (
+                load_run_metadata(run_dir) if os.path.exists(manifest_path) else {}
+            )
         else:
             raise ValueError(f"Unsupported method in {run_dir}: {method}")
 
@@ -85,7 +146,15 @@ def load_paper_runs(
     if df_branches is None:
         raise ValueError("Missing k_sample_ensemble run for paper reproduction.")
 
-    return df_greedy, df_branches, {"resolved_runs": resolved_runs, "temp_dirs": temp_paths}
+    return (
+        df_greedy,
+        df_branches,
+        {
+            "resolved_runs": resolved_runs,
+            "temp_dirs": temp_paths,
+            "resolved_metadata": resolved_metadata,
+        },
+    )
 
 
 def accuracy_greedy(df_greedy: pd.DataFrame) -> float:
@@ -248,10 +317,15 @@ def paper_metrics(df_summary: pd.DataFrame) -> Dict[str, object]:
     return metrics
 
 
-def run_report(df_summary: pd.DataFrame) -> Dict[str, object]:
+def run_report(
+    df_summary: pd.DataFrame, *, run_metadata: Optional[Dict[str, object]] = None
+) -> Dict[str, object]:
     """Compute a JSON-ready report from a summary DataFrame."""
     total = len(df_summary)
     report: Dict[str, object] = {"total": total}
+    metadata = run_metadata or _metadata_from_summary(df_summary)
+    if metadata:
+        report.update(metadata)
     if total == 0:
         return report
 

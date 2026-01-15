@@ -4,10 +4,16 @@ from __future__ import annotations
 
 import argparse
 import os
+from datetime import datetime, timezone
+from typing import Optional
 
-from rofa.core.model import MODEL_ID, load_model_with_fallback, load_tokenizer
+from huggingface_hub import login
+
+from rofa.core.model import load_model_with_fallback, load_tokenizer
+from rofa.core.model_id import to_slug
 from rofa.core.question_set import create_question_set, load_question_set, save_question_set
 from rofa.core.registry import get_paper, list_method_aliases, resolve_method_key
+from rofa.core.run_paths import ensure_model_slug_in_path
 from rofa.core.runner import run_generation
 from rofa.core.schemas import GenerationConfig
 from rofa.papers.from_answers_to_hypotheses import config as default_paper_config
@@ -17,6 +23,7 @@ from rofa.papers.from_answers_to_hypotheses.methods import BranchSamplingEnsembl
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments for generation."""
     parser = argparse.ArgumentParser(description="Generate ROFA run artifacts.")
+    parser.add_argument("--model", required=True, help="Hugging Face model id.")
     parser.add_argument("--paper", default=default_paper_config.PAPER_ID)
     parser.add_argument("--method", help="greedy or branches (alias for k_sample_ensemble)")
     parser.add_argument("--out-dir", help="Output directory for the run artifacts.")
@@ -38,13 +45,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-new-tokens", type=int, default=1024)
     parser.add_argument("--n", type=int, default=100)
+    parser.add_argument("--N", dest="n", type=int, help="Alias for --n.")
     parser.add_argument("--subjects", type=int, default=20)
     parser.add_argument("--dataset-name")
     parser.add_argument("--dataset-split")
     parser.add_argument("--branches", type=int, default=10)
+    parser.add_argument("--k", dest="branches", type=int, help="Alias for --branches.")
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--top-p", type=float, default=0.8)
     parser.add_argument("--top-k", type=int, default=50)
+    parser.add_argument("--hf-token", help="Optional Hugging Face access token.")
+    parser.add_argument(
+        "--hf-token-env",
+        default="HF_TOKEN",
+        help="Environment variable name for HF token (default: HF_TOKEN).",
+    )
     return parser.parse_args()
 
 
@@ -100,6 +115,36 @@ def _build_method(method_key: str, args: argparse.Namespace):
     )
 
 
+def _resolve_hf_token(args: argparse.Namespace) -> Optional[str]:
+    if args.hf_token:
+        return args.hf_token
+    if args.hf_token_env:
+        return os.getenv(args.hf_token_env)
+    return None
+
+
+def _maybe_login(model_id: str, hf_token: Optional[str]) -> None:
+    if model_id.lower().startswith("google/medgemma") and not hf_token:
+        raise ValueError(
+            "This model may be gated on Hugging Face. Accept the model terms in the browser "
+            "while logged in, then provide a HF token (read scope) via HF_TOKEN env var or "
+            "--hf-token."
+        )
+    if hf_token:
+        login(token=hf_token)
+
+
+def _default_run_id(args: argparse.Namespace, method_key: str) -> str:
+    k = args.branches if method_key != "greedy" else 1
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    return f"N{args.n}_seed{args.seed}_k{k}_{timestamp}"
+
+
+def _resolve_run_root(args: argparse.Namespace, model_slug: str, paper_id: str) -> str:
+    base_dir = args.out_dir or os.path.join("runs", paper_id)
+    return ensure_model_slug_in_path(base_dir, model_slug)
+
+
 def main() -> None:
     """Run generation using a preselected paper/method configuration.
 
@@ -119,18 +164,43 @@ def main() -> None:
     if args.create_question_set and not args.method:
         return
     method_key = _resolve_method_key(args, paper)
-    if not args.out_dir:
-        raise ValueError("--out-dir is required when running generation.")
+    model_id = args.model
+    model_slug = to_slug(model_id)
+    run_root = _resolve_run_root(args, model_slug, paper.paper_id)
+    run_id = args.run_id or _default_run_id(args, method_key)
+    run_dir = os.path.join(run_root, run_id)
 
-    tokenizer = load_tokenizer()
-    model = load_model_with_fallback()
+    if args.resume:
+        if not os.path.isdir(run_dir):
+            raise ValueError(f"--resume set but run directory does not exist: {run_dir}")
+    else:
+        if os.path.exists(run_dir):
+            raise ValueError(
+                f"Run directory already exists: {run_dir}. Use --resume to continue."
+            )
+
+    hf_token = _resolve_hf_token(args)
+    _maybe_login(model_id, hf_token)
+
+    try:
+        tokenizer = load_tokenizer(model_id, hf_token=hf_token)
+        model = load_model_with_fallback(model_id, hf_token=hf_token)
+    except Exception as exc:  # noqa: BLE001
+        message = str(exc)
+        if any(code in message for code in ["401", "403", "gated"]):
+            raise RuntimeError(
+                f"{message}\nIf you already provided a token, ensure you accepted the model’s "
+                "access conditions on HF."
+            ) from exc
+        raise
     method, write_full_records = _build_method(method_key, args)
 
     config = GenerationConfig(
         method=method_key,
-        model_id=MODEL_ID,
-        out_dir=args.out_dir,
-        run_id=args.run_id,
+        model_id=model_id,
+        model_slug=model_slug,
+        out_dir=run_root,
+        run_id=run_id,
         resume=args.resume,
         expand=args.expand,
         seed=args.seed,
@@ -151,7 +221,6 @@ def main() -> None:
         method_impl=method,
     )
     run_generation(config)
-    run_dir = os.path.join(args.out_dir, args.run_id) if args.run_id else args.out_dir
     summary_path = os.path.join(run_dir, "summary.jsonl")
     manifest_path = os.path.join(run_dir, "manifest.json")
     question_set_path = os.path.join(run_dir, "question_set.json")
