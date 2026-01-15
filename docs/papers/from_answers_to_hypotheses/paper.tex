@@ -360,16 +360,17 @@ errors. We treat the second category as an \emph{operational proxy} for hypothes
 limitations under this sampling regime, without claiming mechanistic isolation. All percentages are reported as descriptive statistics for this fixed evaluation
 set and should be interpreted as approximate rather than precise estimates.
 
-Taken together, these results suggest three qualitatively distinct failure modes in LLM
-reasoning:
+Taken together, these results suggest three qualitatively distinct failure modes in LLM reasoning.
+Items (1) and (3) form a partition of leader errors under our operational definition, while item (2)
+captures an orthogonal, non-exclusive diagnostic property related to calibration:
 \begin{enumerate}
   \item \textbf{Selection errors} (41.4\% of errors): the correct hypothesis is
     present among alternatives (top-2) but not selected as the final answer.
-  \item \textbf{Calibration/confidence errors} (e.g., 13.2\% wrong even when
+  \item \textbf{Calibration/confidence pathologies} (diagnostic; e.g., 13.2\% wrong even when
     unanimous): internal agreement is misaligned with correctness.
-  \item \textbf{Hypothesis-space limitations} (proxied by 58.6\% of errors where
-    the gold answer is unsurfaced in the top-2): the model converges on an internally
-    coherent but incorrect explanation under the tested sampling regime.
+  \item \textbf{Hypothesis-space limitations} (58.6\% of errors; proxied by gold unsurfaced in
+    the top-2): the model converges on an internally coherent but incorrect explanation under the tested
+    sampling regime.
 \end{enumerate}
 
 Importantly, only the first class is addressable through improved selection or
