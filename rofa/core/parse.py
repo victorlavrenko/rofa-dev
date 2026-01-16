@@ -7,15 +7,18 @@ from dataclasses import dataclass
 from typing import Dict, Mapping, Optional, Sequence, Tuple
 
 # Precompiled regexes
-_RULE1_PATTERNS: list[tuple[re.Pattern[str], int]] = [
-    (re.compile(r"^\s*final\s*[:\-]\s*([ABCD])\b", re.I | re.M), 1),
-    (re.compile(r"\bfinal\s+answer\s*[:\-]\s*([ABCD])\b", re.I), 1),
-    (re.compile(r"\banswer\s*[:\-]\s*([ABCD])\b", re.I), 1),
-    (re.compile(r"\banswer\s+is\s*[:\-]?\s*[*_]*([ABCD])\b", re.I), 1),
+_EXPLICIT_MARKER_PATTERNS: list[tuple[re.Pattern[str], int]] = [
     (
-        re.compile(r"\b(?:correct\s+answer\s+is|the\s+correct\s+answer\s+is)\s*([ABCD])\b", re.I),
+        re.compile(
+            r"\b(?:therefore,\s*)?(?:the\s*)?correct\s+answer\s+is\s*[:\-]?\s*\(?\s*([ABCD])\s*\)?",
+            re.I,
+        ),
         1,
     ),
+    (re.compile(r"\banswer\s*[:\-]\s*\(?\s*([ABCD])\s*\)?", re.I), 1),
+    (re.compile(r"^\s*final\s*[:\-]\s*\(?\s*([ABCD])\s*\)?", re.I | re.M), 1),
+    (re.compile(r"\bfinal\s+answer\s*[:\-]\s*([ABCD])\b", re.I), 1),
+    (re.compile(r"\banswer\s+is\s*[:\-]?\s*[*_]*([ABCD])\b", re.I), 1),
     (
         re.compile(
             r"\bmost\s+probable\s+cause\s+is\s*[:\-]?\s*[*_]*([ABCD])\b",
@@ -41,10 +44,6 @@ _TRAILING_THEREFORE_RX = re.compile(
 )
 _TRAILING_ANSWER_RX = re.compile(r"\banswer\s+is\s*[:\-]?\s*[*_]*([ABCD])\b\s*$", re.I)
 _STANDALONE_LINE_RX = re.compile(r"^\s*([ABCD])\s*[\.]?\s*$", re.I)
-_CORRECT_ANSWER_OVERRIDE_RX = re.compile(
-    r"\b(?:therefore,\s*)?(?:the\s*)?correct answer is\s*([ABCD])\b",
-    re.I,
-)
 _FUZZY_TOKEN_RX = re.compile(r"[a-z0-9/\.]+", re.I)
 _FUZZY_STOPWORDS = {
     "a",
@@ -89,18 +88,7 @@ class ParseDebug:
     matched_option: Optional[str] = None
 
 
-def _extract_rule1(text: str) -> Optional[Tuple[str, int]]:
-    """Return letter and pattern index for explicit final markers."""
-    for idx, (rx, group_index) in enumerate(_RULE1_PATTERNS):
-        last_match: Optional[re.Match[str]] = None
-        for match in rx.finditer(text):
-            last_match = match
-        if last_match is not None:
-            return last_match.group(group_index).upper(), idx
-    return None
-
-
-def _extract_rule2(text: str) -> Optional[str]:
+def _extract_rule1(text: str) -> Optional[str]:
     """Return leading choice label from the first non-empty line."""
     for line in text.splitlines():
         if not line.strip():
@@ -110,6 +98,20 @@ def _extract_rule2(text: str) -> Optional[str]:
             return match.group(1).upper()
         return None
     return None
+
+
+def _extract_rule2(text: str) -> Optional[Tuple[str, int]]:
+    """Return letter and pattern index for explicit final markers."""
+    best: Optional[Tuple[str, int, int]] = None
+    for idx, (rx, group_index) in enumerate(_EXPLICIT_MARKER_PATTERNS):
+        for match in rx.finditer(text):
+            letter = match.group(group_index).upper()
+            end_pos = match.end()
+            if best is None or end_pos >= best[2]:
+                best = (letter, idx, end_pos)
+    if best is None:
+        return None
+    return best[0], best[1]
 
 
 def _extract_rule3(text: str) -> Optional[Tuple[str, str]]:
@@ -146,20 +148,20 @@ def _extract_impl(
 
     t = text.strip()
 
-    strong = _extract_rule1(t)
+    leading = _extract_rule1(t)
+    if leading is not None:
+        dbg = ExtractDebug(method="rule1", scores={leading: 1}) if return_debug else None
+        return leading, dbg
+
+    strong = _extract_rule2(t)
     if strong is not None:
         letter, pattern_idx = strong
         dbg = (
-            ExtractDebug(method=f"rule1[{pattern_idx}]", scores={letter: 1})
+            ExtractDebug(method=f"rule2[{pattern_idx}]", scores={letter: 1})
             if return_debug
             else None
         )
         return letter, dbg
-
-    leading = _extract_rule2(t)
-    if leading is not None:
-        dbg = ExtractDebug(method="rule2", scores={leading: 1}) if return_debug else None
-        return leading, dbg
 
     trailing = _extract_rule3(t)
     if trailing is not None:
@@ -263,16 +265,6 @@ def _match_option_text(text: str, options: Mapping[str, str]) -> Optional[str]:
     return candidates[0][2]
 
 
-def _extract_correct_answer_override(text: str) -> Optional[str]:
-    """Return the explicit correct-answer override if present."""
-    last_match: Optional[re.Match[str]] = None
-    for match in _CORRECT_ANSWER_OVERRIDE_RX.finditer(text):
-        last_match = match
-    if last_match is None:
-        return None
-    return last_match.group(1).upper()
-
-
 def extract_choice_letter(
     text: str,
     options: Mapping[str, str] | Sequence[str] | None = None,
@@ -294,9 +286,6 @@ def extract_choice_letter(
         its heuristics without documenting a protocol change.
     """
     letter, _ = _extract_impl(text, return_debug=False)
-    override = _extract_correct_answer_override(text)
-    if override is not None:
-        return override
     if letter is not None or not options:
         return letter
     option_map = _coerce_options(options)
