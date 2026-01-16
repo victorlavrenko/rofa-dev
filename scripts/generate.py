@@ -184,7 +184,7 @@ def main() -> None:
 
     try:
         tokenizer = load_tokenizer(model_id, hf_token=hf_token)
-        model = load_model_with_fallback(model_id, hf_token=hf_token)
+        model = load_model_with_fallback(model_id, hf_token=hf_token, tokenizer=tokenizer)
     except Exception as exc:  # noqa: BLE001
         message = str(exc)
         if any(code in message for code in ["401", "403", "gated"]):
