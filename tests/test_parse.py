@@ -72,6 +72,37 @@ def test_extract_choice_letter_priority_examples():
         assert extract_choice_letter(text) == expected
 
 
+def test_extract_choice_letter_first_line_regression_cases():
+    cases = [
+        (
+            "B. Estrogen\n\n"
+            "Step-by-step reasoning:\n\n"
+            "1. Sex hormone-binding globulin (SHBG) is a protein that binds to sex hormones...\n",
+            "B",
+        ),
+        (
+            "C. Cervical head gear\n\n"
+            "Explanation: In a Class II division 1 malocclusion...\n",
+            "C",
+        ),
+        (
+            "D. Chorionic villous biopsy\n\n"
+            "Chorionic villous biopsy (CVS) is a prenatal diagnostic test...\n",
+            "D",
+        ),
+        ("A. Artesunate plus lumefantrine\n", "A"),
+        ("C. b-2 microglobulin\n", "C"),
+        (
+            "We consider options A, B, C.\n"
+            "Therefore, the correct answer is D.\n",
+            "D",
+        ),
+    ]
+
+    for text, expected in cases:
+        assert extract_choice_letter(text) == expected
+
+
 def test_extract_choice_letter_regression_cases():
     cases = [
         {
