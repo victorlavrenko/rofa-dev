@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-import time
 import inspect
+import importlib.util
+import os
+import time
 from typing import Callable, List, Optional, Tuple
+
+os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -13,21 +18,48 @@ from .parse import cop_to_letter, extract_choice_letter
 
 DEFAULT_MODEL_ID = "HPAI-BSC/Llama3.1-Aloe-Beta-8B"
 
+torch.set_float32_matmul_precision("high")
+
 
 def load_tokenizer(model_id: str, hf_token: Optional[str] = None):
     """Load the tokenizer for the model."""
     return AutoTokenizer.from_pretrained(model_id, use_fast=True, token=hf_token)
 
 
-def load_model(model_id: str, attn_impl: str, hf_token: Optional[str] = None):
+def load_model(model_id: str, attn_impl: Optional[str], hf_token: Optional[str] = None):
     """Load the model with the requested attention implementation."""
-    return AutoModelForCausalLM.from_pretrained(
-        model_id,
-        dtype=torch.bfloat16,
-        device_map={"": "cuda:0"},
-        attn_implementation=attn_impl,  # "flash_attention_2" или "sdpa"
-        token=hf_token,
-    ).eval()
+    kwargs = {
+        "torch_dtype": torch.bfloat16,
+        "device_map": "cuda",
+        "low_cpu_mem_usage": True,
+        "token": hf_token,
+    }
+    if attn_impl:
+        kwargs["attn_implementation"] = attn_impl  # "flash_attention_2" или "sdpa"
+    model = AutoModelForCausalLM.from_pretrained(model_id, **kwargs).eval()
+    if attn_impl:
+        if hasattr(model.config, "attn_implementation"):
+            model.config.attn_implementation = attn_impl
+        if hasattr(model.config, "_attn_implementation"):
+            model.config._attn_implementation = attn_impl
+    return model
+
+
+def has_flash_attn() -> bool:
+    """Return True if flash_attn is importable."""
+    return importlib.util.find_spec("flash_attn") is not None
+
+
+def _resolve_attn_implementation(model) -> Optional[str]:
+    """Return the configured attention implementation name when available."""
+    config = getattr(model, "config", None)
+    if config is None:
+        return None
+    for attr in ("attn_implementation", "_attn_implementation"):
+        value = getattr(config, attr, None)
+        if isinstance(value, str) and value:
+            return value
+    return None
 
 
 def _is_medgemma_model(model_id: Optional[str]) -> bool:
@@ -68,18 +100,30 @@ def load_model_with_fallback(
     model_id: str, hf_token: Optional[str] = None, tokenizer=None
 ):
     """Load the model, preferring FlashAttention2 and falling back to SDPA."""
-    try:
-        model = load_model(model_id, "flash_attention_2", hf_token=hf_token)
-        attn_impl = "flash_attention_2"
-    except Exception as exc:  # noqa: BLE001
-        print("FlashAttention2 failed, falling back to SDPA:", repr(exc))
-        model = load_model(model_id, "sdpa", hf_token=hf_token)
-        attn_impl = "sdpa"
-    print("Using", "FlashAttention2" if attn_impl == "flash_attention_2" else "SDPA")
-    print("attn_implementation in config:", getattr(model.config, "_attn_implementation", None))
+    flash_available = has_flash_attn()
+    attn_impl: Optional[str] = None
+    if flash_available:
+        try:
+            model = load_model(model_id, "flash_attention_2", hf_token=hf_token)
+            attn_impl = "flash_attention_2"
+        except Exception as exc:  # noqa: BLE001
+            print("FlashAttention2 failed, falling back to SDPA:", repr(exc))
+            model = load_model(model_id, "sdpa", hf_token=hf_token)
+            attn_impl = "sdpa"
+    else:
+        model = load_model(model_id, None, hf_token=hf_token)
+    attn_label = attn_impl or _resolve_attn_implementation(model) or "default"
+    print("Using attention implementation:", attn_label)
+    print(
+        "attn_implementation in config:",
+        _resolve_attn_implementation(model),
+    )
+    if hasattr(model.config, "use_cache"):
+        model.config.use_cache = True
+    if hasattr(model, "generation_config") and hasattr(model.generation_config, "use_cache"):
+        model.generation_config.use_cache = True
     if _is_medgemma_model(model_id):
-        cache_impl = getattr(model.config, "cache_implementation", None)
-        if cache_impl == "hybrid":
+        if hasattr(model.config, "cache_implementation"):
             model.config.cache_implementation = "static"
         if hasattr(model, "generation_config"):
             model.generation_config.cache_implementation = "static"
@@ -204,7 +248,8 @@ def infer_one(
             prompt = None
     if prompt is None:
         prompt = f"{system_prompt}\n\n{user_prompt}"
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    inputs = tokenizer(prompt, return_tensors="pt")
+    inputs = {key: value.to(model.device) for key, value in inputs.items()}
 
     if torch.cuda.is_available():
         torch.cuda.synchronize()
