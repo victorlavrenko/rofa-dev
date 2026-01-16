@@ -176,6 +176,18 @@ def test_extract_choice_letter_regression_cases():
                 "Therefore, the correct answer is D.\n"
             ),
         },
+        {
+            "index": 21,
+            "id": "71f6de26-288f-4f52-8d52-acebacb7e001",
+            "expected": "C",
+            "model_output": (
+                "Based on the information provided, the immunofluorescence staining pattern from a kidney biopsy suggests a granular pattern, which is characteristic of immune complex deposition. "
+                "Among the given options, the most probable cause is:\n\n"
+                "C. Lupus Nephritis\n\n"
+                "This is because lupus nephritis is an immune complex-mediated glomerulonephritis, and the granular immunofluorescence pattern is a hallmark of this condition. "
+                "FSGS (A) typically shows a \"spike and dome\" pattern, PSGN (B) shows a \"lumpy bumpy\" pattern, and Goodpasture syndrome (D) shows linear staining along the glomerular basement membrane."
+            ),
+        },
     ]
 
     for case in cases:

@@ -18,6 +18,13 @@ _RULE1_PATTERNS: list[tuple[re.Pattern[str], int]] = [
     ),
     (
         re.compile(
+            r"\bmost\s+probable\s+cause\s+is\s*[:\-]?\s*[*_]*([ABCD])\b",
+            re.I,
+        ),
+        1,
+    ),
+    (
+        re.compile(
             r"\boption\s*([ABCD])\b\s*(?:is\s*)?(?:correct|best|most\s+likely|most\s+accurate)\b",
             re.I,
         ),
