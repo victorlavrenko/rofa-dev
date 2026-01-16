@@ -41,6 +41,7 @@ class GreedyDecode:
             system_prompt=SYSTEM,
             build_user_prompt=build_user,
             max_new_tokens=max_new_tokens,
+            log_greedy=(index == 0),
         )
 
         return {

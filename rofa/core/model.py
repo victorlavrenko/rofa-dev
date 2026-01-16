@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import copy
 import time
+import inspect
 from typing import Callable, List, Optional, Tuple
 
 import torch
@@ -81,6 +81,8 @@ def load_model_with_fallback(
         cache_impl = getattr(model.config, "cache_implementation", None)
         if cache_impl == "hybrid":
             model.config.cache_implementation = "static"
+        if hasattr(model, "generation_config"):
+            model.generation_config.cache_implementation = "static"
     if tokenizer is not None:
         _configure_generation_padding(tokenizer, model)
     return model
@@ -98,6 +100,55 @@ def get_eos_ids(tokenizer) -> List[int]:
     return list({i for i in eos_ids if isinstance(i, int)})
 
 
+def _apply_cache_implementation(model, cache_implementation: str) -> dict[str, object]:
+    """Set supported cache implementation on config or generation kwargs."""
+    kwargs: dict[str, object] = {}
+    gen_config = getattr(model, "generation_config", None)
+    if gen_config is not None and hasattr(gen_config, "cache_implementation"):
+        gen_config.cache_implementation = cache_implementation
+    signature = inspect.signature(model.generate)
+    if "cache_implementation" in signature.parameters:
+        kwargs["cache_implementation"] = cache_implementation
+    return kwargs
+
+
+def generate_greedy(
+    model,
+    inputs: dict,
+    *,
+    max_new_tokens: int,
+    pad_token_id: int,
+    eos_token_id: List[int] | int,
+    cache_implementation: str = "static",
+    log_assertions: bool = False,
+):
+    """Run deterministic greedy generation with safe defaults for MedGemma."""
+    gen_kwargs: dict[str, object] = dict(
+        **inputs,
+        do_sample=False,
+        num_beams=1,
+        max_new_tokens=max_new_tokens,
+        use_cache=True,
+        pad_token_id=pad_token_id,
+        eos_token_id=eos_token_id,
+    )
+    gen_kwargs.update(_apply_cache_implementation(model, cache_implementation))
+    if log_assertions:
+        print(
+            "Greedy generation kwargs:",
+            {
+                "do_sample": gen_kwargs.get("do_sample"),
+                "num_beams": gen_kwargs.get("num_beams"),
+                "max_new_tokens": gen_kwargs.get("max_new_tokens"),
+                "cache_implementation": gen_kwargs.get("cache_implementation", None),
+            },
+        )
+        assert gen_kwargs.get("do_sample") is False
+        assert gen_kwargs.get("num_beams", 1) == 1
+        assert "top_k" not in gen_kwargs and "top_p" not in gen_kwargs
+    return model.generate(**gen_kwargs)
+
+
 def infer_one(
     example,
     tokenizer,
@@ -111,6 +162,7 @@ def infer_one(
     do_sample: Optional[bool] = None,
     top_p: float = 1.0,
     top_k: int = 0,
+    log_greedy: bool = False,
 ) -> Tuple[Optional[str], str, str, float]:
     """
     Backward-compatible inference.
@@ -158,53 +210,50 @@ def infer_one(
         torch.cuda.synchronize()
     t0 = time.time()
 
-    gen_kwargs: dict[str, object] = dict(
-        **inputs,
-        max_new_tokens=max_new_tokens,
-        do_sample=do_sample,
-        num_beams=1,
-        use_cache=True,
-    )
     eos_ids = get_eos_ids(tokenizer)
     pad_id = tokenizer.pad_token_id
     if pad_id is None:
         pad_id = eos_ids[0] if eos_ids else tokenizer.eos_token_id
+    eos_token_id = eos_ids or tokenizer.eos_token_id
     # Pass pad/eos ids explicitly to avoid repeated Transformers fallback warnings.
-    gen_kwargs.update(pad_token_id=pad_id, eos_token_id=eos_ids or tokenizer.eos_token_id)
-
-    gen_config = copy.deepcopy(getattr(model, "generation_config", None))
-    model_id = _resolve_model_id(model)
-    is_medgemma = _is_medgemma_model(model_id)
-
     if do_sample:
-        if gen_config is not None and is_medgemma:
-            gen_config.do_sample = True
-            if hasattr(gen_config, "temperature"):
-                gen_config.temperature = temperature
-            if hasattr(gen_config, "top_p"):
-                gen_config.top_p = top_p
-            if hasattr(gen_config, "top_k"):
-                gen_config.top_k = top_k
-            gen_kwargs["generation_config"] = gen_config
+        gen_kwargs: dict[str, object] = dict(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=True,
+            num_beams=1,
+            use_cache=True,
+            pad_token_id=pad_id,
+            eos_token_id=eos_token_id,
+        )
+        model_id = _resolve_model_id(model)
+        is_medgemma = _is_medgemma_model(model_id)
+        if is_medgemma and hasattr(model, "generation_config"):
+            model.generation_config.do_sample = True
+            if hasattr(model.generation_config, "temperature"):
+                model.generation_config.temperature = temperature
+            if hasattr(model.generation_config, "top_p"):
+                model.generation_config.top_p = top_p
+            if hasattr(model.generation_config, "top_k"):
+                model.generation_config.top_k = top_k
         else:
             gen_kwargs.update(
                 temperature=temperature,
                 top_p=top_p,
                 top_k=top_k,
             )
+        with torch.inference_mode():
+            out = model.generate(**gen_kwargs)
     else:
-        if gen_config is not None:
-            gen_config.do_sample = False
-            if hasattr(gen_config, "temperature"):
-                gen_config.temperature = 1.0
-            if hasattr(gen_config, "top_p"):
-                gen_config.top_p = 1.0
-            if hasattr(gen_config, "top_k"):
-                gen_config.top_k = 50
-            gen_kwargs["generation_config"] = gen_config
-
-    with torch.no_grad():
-        out = model.generate(**gen_kwargs)
+        with torch.inference_mode():
+            out = generate_greedy(
+                model,
+                inputs,
+                max_new_tokens=max_new_tokens,
+                pad_token_id=pad_id,
+                eos_token_id=eos_token_id,
+                log_assertions=log_greedy,
+            )
 
     if torch.cuda.is_available():
         torch.cuda.synchronize()
