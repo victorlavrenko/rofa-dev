@@ -38,6 +38,30 @@ _CORRECT_ANSWER_OVERRIDE_RX = re.compile(
     r"\b(?:therefore,\s*)?(?:the\s*)?correct answer is\s*([ABCD])\b",
     re.I,
 )
+_FUZZY_TOKEN_RX = re.compile(r"[a-z0-9/\.]+", re.I)
+_FUZZY_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "in",
+    "is",
+    "it",
+    "of",
+    "on",
+    "or",
+    "per",
+    "that",
+    "the",
+    "to",
+    "with",
+}
 
 
 @dataclass(frozen=True)
@@ -164,6 +188,24 @@ def _option_is_too_short(option: str) -> bool:
     return not re.search(r"\d", option)
 
 
+def _fuzzy_tokens(text: str) -> set[str]:
+    tokens = _FUZZY_TOKEN_RX.findall(text.lower())
+    filtered = set()
+    for token in tokens:
+        token = token.strip(".")
+        if not token:
+            continue
+        if token in _FUZZY_STOPWORDS:
+            continue
+        if len(token) >= 3 or re.search(r"[\d/]", token):
+            filtered.add(token)
+    return filtered
+
+
+def _has_numeric_token(tokens: set[str]) -> bool:
+    return any(re.search(r"[\d/]", token) for token in tokens)
+
+
 def _match_option_text(text: str, options: Mapping[str, str]) -> Optional[str]:
     if not text:
         return None
@@ -181,7 +223,34 @@ def _match_option_text(text: str, options: Mapping[str, str]) -> Optional[str]:
             candidates.append((len(option_norm), idx, letter))
 
     if not candidates:
-        return None
+        output_tokens = _fuzzy_tokens(text[-800:])
+        if not output_tokens:
+            return None
+        fuzzy_candidates = []
+        for letter, option_text in options.items():
+            option_norm = _normalize_option_text(option_text)
+            if not option_norm or _option_is_too_short(option_norm):
+                continue
+            option_tokens = _fuzzy_tokens(option_text)
+            if not option_tokens:
+                continue
+            overlap = output_tokens & option_tokens
+            overlap_count = len(overlap)
+            numeric_overlap = _has_numeric_token(overlap)
+            if overlap_count >= 2 or (overlap_count == 1 and numeric_overlap):
+                fuzzy_candidates.append(
+                    (overlap_count, int(numeric_overlap), len(option_tokens), letter)
+                )
+
+        if not fuzzy_candidates:
+            return None
+        fuzzy_candidates.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
+        if (
+            len(fuzzy_candidates) > 1
+            and fuzzy_candidates[0][:3] == fuzzy_candidates[1][:3]
+        ):
+            return None
+        return fuzzy_candidates[0][3]
 
     candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
     return candidates[0][2]

@@ -35,6 +35,18 @@ def test_extract_choice_letter_from_options():
     text = "Printing uses black ink for the key color."
     assert extract_choice_letter(text, options=list_options) == "D"
 
+    options = {
+        "A": "Urinary concentration in g/24 hour",
+        "B": "Urinary concentration in mg/ml",
+        "C": "Urine osmolarity",
+        "D": "Urine volume per minute",
+    }
+    text = (
+        "U in the formula for urea clearance stands for urinary urea concentration, "
+        "typically expressed in mg/ml."
+    )
+    assert extract_choice_letter(text, options=options) == "B"
+
 
 def test_extract_choice_letter_priority_examples():
     samples = [
