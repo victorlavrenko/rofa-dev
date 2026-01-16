@@ -7,21 +7,37 @@ from dataclasses import dataclass
 from typing import Dict, Mapping, Optional, Sequence, Tuple
 
 # Precompiled regexes
-_STRONG_PATTERNS = [
-    re.compile(r"(?:^|\n)\s*(?:final\s+answer|answer)\s*[:\-–]\s*([ABCD])\b", re.I),
-    re.compile(r"\b(?:so,?\s*)?(?:the\s+)?answer\s+is\s*([ABCD])\b", re.I),
-    re.compile(r"\b(?:correct\s+answer|correct\s+option)\s*(?:is|:)\s*([ABCD])\b", re.I),
-    re.compile(
-        r"\boption\s*([ABCD])\b\s*(?:is\s*)?(?:correct|best|most\s+likely|most\s+accurate)\b",
-        re.I,
+_RULE1_PATTERNS: list[tuple[re.Pattern[str], int]] = [
+    (re.compile(r"^\s*final\s*[:\-]\s*([ABCD])\b", re.I | re.M), 1),
+    (re.compile(r"\bfinal\s+answer\s*[:\-]\s*([ABCD])\b", re.I), 1),
+    (re.compile(r"\banswer\s*[:\-]\s*([ABCD])\b", re.I), 1),
+    (re.compile(r"\banswer\s+is\s*[:\-]?\s*[*_]*([ABCD])\b", re.I), 1),
+    (
+        re.compile(r"\b(?:correct\s+answer\s+is|the\s+correct\s+answer\s+is)\s*([ABCD])\b", re.I),
+        1,
     ),
+    (
+        re.compile(
+            r"\boption\s*([ABCD])\b\s*(?:is\s*)?(?:correct|best|most\s+likely|most\s+accurate)\b",
+            re.I,
+        ),
+        1,
+    ),
+    (re.compile(r"\(([ABCD])\)\s+is\s+(?:best|correct)\b", re.I), 1),
+    (re.compile(r"\bwe\s+choose\s+([ABCD])\b", re.I), 1),
 ]
 
-_KEYWORD_RX = re.compile(r"\b(answer|final|correct|best|therefore|so)\b", re.I)
-_END_LETTER_RX = re.compile(r"\b([ABCD])\b\s*[\.\!\?]?\s*$", re.I)
-_PAREN_LETTER_RX = re.compile(r"[\(\[]\s*([ABCD])\s*[\)\]]", re.I)
-_ENUM_LINE_RX = re.compile(r"^\s*([ABCD])\s*[\.\)]\s", re.I)
-_WEAK_TAIL_RX = re.compile(r"(?:^|[\s\(\[\{])([ABCD])(?:[\]\}\)\s\.\!\?]|$)", re.I)
+_LEADING_LINE_RX = re.compile(r"^\s*([ABCD])\s*[\.\)\:\-]\s+", re.I)
+_TRAILING_THEREFORE_RX = re.compile(
+    r"\b(therefore|so|thus)\b.*\b([ABCD])\b\s*[\.\)]?\s*$",
+    re.I | re.S,
+)
+_TRAILING_ANSWER_RX = re.compile(r"\banswer\s+is\s*[:\-]?\s*[*_]*([ABCD])\b\s*$", re.I)
+_STANDALONE_LINE_RX = re.compile(r"^\s*([ABCD])\s*[\.]?\s*$", re.I)
+_CORRECT_ANSWER_OVERRIDE_RX = re.compile(
+    r"\b(?:therefore,\s*)?(?:the\s*)?correct answer is\s*([ABCD])\b",
+    re.I,
+)
 
 
 @dataclass(frozen=True)
@@ -42,59 +58,49 @@ class ParseDebug:
     matched_option: Optional[str] = None
 
 
-def _extract_strong_match(text: str) -> Optional[Tuple[str, int]]:
-    """Return a strong match letter and pattern index if found."""
-    last: Optional[Tuple[int, str, int]] = None
-    for idx, rx in enumerate(_STRONG_PATTERNS):
+def _extract_rule1(text: str) -> Optional[Tuple[str, int]]:
+    """Return letter and pattern index for explicit final markers."""
+    for idx, (rx, group_index) in enumerate(_RULE1_PATTERNS):
+        last_match: Optional[re.Match[str]] = None
         for match in rx.finditer(text):
-            last = (match.start(1), match.group(1).upper(), idx)
-    if last is None:
-        return None
-    return last[1], last[2]
+            last_match = match
+        if last_match is not None:
+            return last_match.group(group_index).upper(), idx
+    return None
 
 
-def _score_tail(tail: str) -> Dict[str, int]:
-    scores: Dict[str, int] = {k: 0 for k in "ABCD"}
-
-    for match in _KEYWORD_RX.finditer(tail):
-        window = tail[match.start() : match.start() + 120]
-        for letter in "ABCD":
-            if re.search(rf"\b{letter}\b", window, re.I):
-                scores[letter] += 5
-
-    end_match = _END_LETTER_RX.search(tail)
-    if end_match:
-        scores[end_match.group(1).upper()] += 6
-
-    for match in _PAREN_LETTER_RX.finditer(tail):
-        scores[match.group(1).upper()] += 2
-
-    enum_counts = {k: 0 for k in "ABCD"}
-    for line in tail.splitlines():
-        enum_match = _ENUM_LINE_RX.match(line)
-        if enum_match:
-            enum_counts[enum_match.group(1).upper()] += 1
-
-    if sum(enum_counts.values()) >= 2:
-        for letter in "ABCD":
-            scores[letter] -= min(2, enum_counts[letter])
-
-    return scores
-
-
-def _select_best_score(scores: Dict[str, int]) -> Tuple[str, int]:
-    return max(scores.items(), key=lambda kv: kv[1])
-
-
-def _extract_weak_tail(tail: str) -> Optional[str]:
-    last_letter: Optional[str] = None
-    for match in _WEAK_TAIL_RX.finditer(tail):
-        letter = match.group(1).upper()
-        suffix = tail[match.start() : match.start() + 4]
-        if _ENUM_LINE_RX.match(suffix):
+def _extract_rule2(text: str) -> Optional[str]:
+    """Return leading choice label from the first non-empty line."""
+    for line in text.splitlines():
+        if not line.strip():
             continue
-        last_letter = letter
-    return last_letter
+        match = _LEADING_LINE_RX.match(line)
+        if match:
+            return match.group(1).upper()
+        return None
+    return None
+
+
+def _extract_rule3(text: str) -> Optional[Tuple[str, str]]:
+    """Return trailing conclusion patterns and the method label."""
+    tail = text[-400:]
+    match = _TRAILING_THEREFORE_RX.search(tail)
+    if match:
+        return match.group(2).upper(), "therefore"
+    match = _TRAILING_ANSWER_RX.search(tail)
+    if match:
+        return match.group(1).upper(), "answer"
+    return None
+
+
+def _extract_rule4(text: str, *, lines: int = 5) -> Optional[str]:
+    """Return a conservative fallback from the last non-empty lines."""
+    non_empty = [line for line in text.splitlines() if line.strip()]
+    for line in reversed(non_empty[-lines:]):
+        match = _STANDALONE_LINE_RX.match(line)
+        if match:
+            return match.group(1).upper()
+    return None
 
 
 def _extract_impl(
@@ -109,26 +115,30 @@ def _extract_impl(
 
     t = text.strip()
 
-    strong = _extract_strong_match(t)
+    strong = _extract_rule1(t)
     if strong is not None:
         letter, pattern_idx = strong
         dbg = (
-            ExtractDebug(method=f"strong[{pattern_idx}]", scores={letter: 999})
+            ExtractDebug(method=f"rule1[{pattern_idx}]", scores={letter: 1})
             if return_debug
             else None
         )
         return letter, dbg
 
-    tail = t[-800:]
-    scores = _score_tail(tail)
-    best_letter, best_score = _select_best_score(scores)
-    if best_score >= 4:
-        dbg = ExtractDebug(method="tail-score", scores=scores) if return_debug else None
-        return best_letter, dbg
+    leading = _extract_rule2(t)
+    if leading is not None:
+        dbg = ExtractDebug(method="rule2", scores={leading: 1}) if return_debug else None
+        return leading, dbg
 
-    last_letter = _extract_weak_tail(tail)
-    dbg = ExtractDebug(method="weak-tail", scores=scores) if return_debug else None
-    return last_letter, dbg
+    trailing = _extract_rule3(t)
+    if trailing is not None:
+        letter, method = trailing
+        dbg = ExtractDebug(method=f"rule3[{method}]", scores={letter: 1}) if return_debug else None
+        return letter, dbg
+
+    fallback = _extract_rule4(t)
+    dbg = ExtractDebug(method="rule4", scores={}) if return_debug else None
+    return fallback, dbg
 
 
 def _coerce_options(options: Mapping[str, str] | Sequence[str]) -> Dict[str, str]:
@@ -177,6 +187,16 @@ def _match_option_text(text: str, options: Mapping[str, str]) -> Optional[str]:
     return candidates[0][2]
 
 
+def _extract_correct_answer_override(text: str) -> Optional[str]:
+    """Return the explicit correct-answer override if present."""
+    last_match: Optional[re.Match[str]] = None
+    for match in _CORRECT_ANSWER_OVERRIDE_RX.finditer(text):
+        last_match = match
+    if last_match is None:
+        return None
+    return last_match.group(1).upper()
+
+
 def extract_choice_letter(
     text: str,
     options: Mapping[str, str] | Sequence[str] | None = None,
@@ -198,6 +218,9 @@ def extract_choice_letter(
         its heuristics without documenting a protocol change.
     """
     letter, _ = _extract_impl(text, return_debug=False)
+    override = _extract_correct_answer_override(text)
+    if override is not None:
+        return override
     if letter is not None or not options:
         return letter
     option_map = _coerce_options(options)
