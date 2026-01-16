@@ -12,9 +12,9 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple, cast
 import pandas as pd
 
 from rofa.core.io import load_manifest, unpack_zip
-from rofa.core.model_id import to_slug
 from rofa.core.metrics import r_w_other_class
 from rofa.core.metrics import top2_coverage as metrics_top2_coverage
+from rofa.core.model_id import to_slug
 
 METHOD_GREEDY = "greedy"
 METHOD_K_SAMPLE = "k_sample_ensemble"

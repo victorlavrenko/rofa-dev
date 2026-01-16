@@ -7,7 +7,6 @@ from typing import Iterable, Optional, Tuple
 import matplotlib.pyplot as plt
 import pandas as pd
 
-
 _REQUIRED_COLUMNS = {
     "top1_votes_min",
     "top1_votes_max",

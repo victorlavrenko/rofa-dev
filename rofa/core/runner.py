@@ -9,7 +9,14 @@ from typing import Any, Dict, Optional
 
 from tqdm import tqdm
 
-from .io import _append_jsonl, _now_utc, load_manifest, load_progress, write_manifest, write_progress
+from .io import (
+    _append_jsonl,
+    _now_utc,
+    load_manifest,
+    load_progress,
+    write_manifest,
+    write_progress,
+)
 from .parse import cop_to_letter
 from .question_set import (
     create_question_set,
