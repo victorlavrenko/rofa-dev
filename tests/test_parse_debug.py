@@ -10,8 +10,8 @@ def test_extract_choice_letter_debug_empty():
 def test_extract_choice_letter_debug_tail_score():
     debug = extract_choice_letter_debug("We considered options. Therefore B.")
     assert debug.letter == "B"
-    assert debug.method == "tail-score"
-    assert debug.scores["B"] >= 5
+    assert debug.method == "rule3[therefore]"
+    assert debug.scores["B"] == 1
 
 
 def test_extract_choice_letter_debug_option_text():
