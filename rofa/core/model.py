@@ -30,6 +30,27 @@ def load_model(model_id: str, attn_impl: str, hf_token: Optional[str] = None):
     ).eval()
 
 
+def _is_medgemma_model(model_id: Optional[str]) -> bool:
+    """Return True when the model id refers to MedGemma variants."""
+    if not model_id:
+        return False
+    return model_id.lower().startswith("google/medgemma")
+
+
+def _resolve_model_id(model) -> str:
+    """Resolve the model id/name from common model attributes."""
+    for attr in ("name_or_path",):
+        value = getattr(model, attr, None)
+        if isinstance(value, str) and value:
+            return value
+    config = getattr(model, "config", None)
+    for attr in ("name_or_path", "_name_or_path", "model_id"):
+        value = getattr(config, attr, None) if config is not None else None
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
 def _configure_generation_padding(tokenizer, model) -> None:
     """Ensure pad/eos ids are consistent to avoid repeated Transformers warnings."""
     eos_ids = get_eos_ids(tokenizer)
@@ -56,6 +77,10 @@ def load_model_with_fallback(
         attn_impl = "sdpa"
     print("Using", "FlashAttention2" if attn_impl == "flash_attention_2" else "SDPA")
     print("attn_implementation in config:", getattr(model.config, "_attn_implementation", None))
+    if _is_medgemma_model(model_id):
+        cache_impl = getattr(model.config, "cache_implementation", None)
+        if cache_impl == "hybrid":
+            model.config.cache_implementation = "static"
     if tokenizer is not None:
         _configure_generation_padding(tokenizer, model)
     return model
@@ -147,19 +172,35 @@ def infer_one(
     # Pass pad/eos ids explicitly to avoid repeated Transformers fallback warnings.
     gen_kwargs.update(pad_token_id=pad_id, eos_token_id=eos_ids or tokenizer.eos_token_id)
 
+    gen_config = copy.deepcopy(getattr(model, "generation_config", None))
+    model_id = _resolve_model_id(model)
+    is_medgemma = _is_medgemma_model(model_id)
+
     if do_sample:
-        gen_kwargs.update(
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k,
-        )
+        if gen_config is not None and is_medgemma:
+            gen_config.do_sample = True
+            if hasattr(gen_config, "temperature"):
+                gen_config.temperature = temperature
+            if hasattr(gen_config, "top_p"):
+                gen_config.top_p = top_p
+            if hasattr(gen_config, "top_k"):
+                gen_config.top_k = top_k
+            gen_kwargs["generation_config"] = gen_config
+        else:
+            gen_kwargs.update(
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+            )
     else:
-        gen_config = copy.deepcopy(getattr(model, "generation_config", None))
         if gen_config is not None:
             gen_config.do_sample = False
-            gen_config.temperature = 1.0
-            gen_config.top_p = 1.0
-            gen_config.top_k = 50
+            if hasattr(gen_config, "temperature"):
+                gen_config.temperature = 1.0
+            if hasattr(gen_config, "top_p"):
+                gen_config.top_p = 1.0
+            if hasattr(gen_config, "top_k"):
+                gen_config.top_k = 50
             gen_kwargs["generation_config"] = gen_config
 
     with torch.no_grad():
