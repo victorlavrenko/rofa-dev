@@ -30,7 +30,22 @@ def load_model(model_id: str, attn_impl: str, hf_token: Optional[str] = None):
     ).eval()
 
 
-def load_model_with_fallback(model_id: str, hf_token: Optional[str] = None):
+def _configure_generation_padding(tokenizer, model) -> None:
+    """Ensure pad/eos ids are consistent to avoid repeated Transformers warnings."""
+    eos_ids = get_eos_ids(tokenizer)
+    if tokenizer.pad_token_id is None:
+        if eos_ids:
+            tokenizer.pad_token_id = eos_ids[0]
+        else:
+            tokenizer.pad_token_id = tokenizer.eos_token_id
+    if tokenizer.pad_token_id is not None:
+        model.config.pad_token_id = tokenizer.pad_token_id
+        model.generation_config.pad_token_id = tokenizer.pad_token_id
+
+
+def load_model_with_fallback(
+    model_id: str, hf_token: Optional[str] = None, tokenizer=None
+):
     """Load the model, preferring FlashAttention2 and falling back to SDPA."""
     try:
         model = load_model(model_id, "flash_attention_2", hf_token=hf_token)
@@ -41,6 +56,8 @@ def load_model_with_fallback(model_id: str, hf_token: Optional[str] = None):
         attn_impl = "sdpa"
     print("Using", "FlashAttention2" if attn_impl == "flash_attention_2" else "SDPA")
     print("attn_implementation in config:", getattr(model.config, "_attn_implementation", None))
+    if tokenizer is not None:
+        _configure_generation_padding(tokenizer, model)
     return model
 
 
@@ -92,10 +109,7 @@ def infer_one(
     if temperature is None:
         temperature = 1.0
 
-    if tokenizer.pad_token_id is None and tokenizer.eos_token_id is not None:
-        tokenizer.pad_token_id = tokenizer.eos_token_id
-    if getattr(model.config, "pad_token_id", None) is None and tokenizer.pad_token_id is not None:
-        model.config.pad_token_id = tokenizer.pad_token_id
+    _configure_generation_padding(tokenizer, model)
 
     user_prompt = build_user_prompt(example)
     messages = [
@@ -126,6 +140,12 @@ def infer_one(
         num_beams=1,
         use_cache=True,
     )
+    eos_ids = get_eos_ids(tokenizer)
+    pad_id = tokenizer.pad_token_id
+    if pad_id is None:
+        pad_id = eos_ids[0] if eos_ids else tokenizer.eos_token_id
+    # Pass pad/eos ids explicitly to avoid repeated Transformers fallback warnings.
+    gen_kwargs.update(pad_token_id=pad_id, eos_token_id=eos_ids or tokenizer.eos_token_id)
 
     if do_sample:
         gen_kwargs.update(
