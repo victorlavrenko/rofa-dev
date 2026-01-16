@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import time
 from typing import Callable, List, Optional, Tuple
 
@@ -91,6 +92,11 @@ def infer_one(
     if temperature is None:
         temperature = 1.0
 
+    if tokenizer.pad_token_id is None and tokenizer.eos_token_id is not None:
+        tokenizer.pad_token_id = tokenizer.eos_token_id
+    if getattr(model.config, "pad_token_id", None) is None and tokenizer.pad_token_id is not None:
+        model.config.pad_token_id = tokenizer.pad_token_id
+
     user_prompt = build_user_prompt(example)
     messages = [
         {"role": "system", "content": system_prompt},
@@ -127,6 +133,14 @@ def infer_one(
             top_p=top_p,
             top_k=top_k,
         )
+    else:
+        gen_config = copy.deepcopy(getattr(model, "generation_config", None))
+        if gen_config is not None:
+            gen_config.do_sample = False
+            gen_config.temperature = 1.0
+            gen_config.top_p = 1.0
+            gen_config.top_k = 50
+            gen_kwargs["generation_config"] = gen_config
 
     with torch.no_grad():
         out = model.generate(**gen_kwargs)
