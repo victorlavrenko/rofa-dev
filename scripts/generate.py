@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
+import sys
 from datetime import datetime, timezone
 from typing import Optional
 
+os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+
+import torch
 from huggingface_hub import login
 
-from rofa.core.model import load_model_with_fallback, load_tokenizer
+from rofa.core.model import has_flash_attn, load_model_with_fallback, load_tokenizer
 from rofa.core.model_id import to_slug
 from rofa.core.question_set import create_question_set, load_question_set, save_question_set
 from rofa.core.registry import get_paper, list_method_aliases, resolve_method_key
@@ -134,6 +140,40 @@ def _maybe_login(model_id: str, hf_token: Optional[str]) -> None:
         login(token=hf_token)
 
 
+def _in_colab() -> bool:
+    return bool(os.environ.get("COLAB_RELEASE_TAG") or os.environ.get("COLAB_GPU"))
+
+
+def _ensure_flash_attn() -> bool:
+    if has_flash_attn():
+        return True
+    if not _in_colab():
+        return False
+    print("flash_attn not found; installing flash-attn (may require a runtime restart).")
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "-q", "install", "flash-attn", "--no-build-isolation"],
+            check=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print("flash_attn install failed; continuing without FlashAttention:", repr(exc))
+        return False
+    return has_flash_attn()
+
+
+def _print_runtime_summary(model) -> None:
+    gpu_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
+    dtype = next(model.parameters()).dtype
+    gen_config = getattr(model, "generation_config", None)
+    print("GPU:", gpu_name)
+    print("dtype:", dtype)
+    print("TORCHDYNAMO_DISABLE:", os.environ.get("TORCHDYNAMO_DISABLE"))
+    print("use_cache:", getattr(model.config, "use_cache", None))
+    print("cache_impl:", getattr(gen_config, "cache_implementation", None))
+    print("attn_impl:", getattr(model.config, "attn_implementation", None))
+    print("flash_attn_available:", has_flash_attn())
+
+
 def _default_run_id(args: argparse.Namespace, method_key: str) -> str:
     k = args.branches if method_key != "greedy" else 1
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -181,6 +221,7 @@ def main() -> None:
 
     hf_token = _resolve_hf_token(args)
     _maybe_login(model_id, hf_token)
+    _ensure_flash_attn()
 
     try:
         tokenizer = load_tokenizer(model_id, hf_token=hf_token)
@@ -194,6 +235,7 @@ def main() -> None:
             ) from exc
         raise
     method, write_full_records = _build_method(method_key, args)
+    _print_runtime_summary(model)
 
     config = GenerationConfig(
         method=method_key,
