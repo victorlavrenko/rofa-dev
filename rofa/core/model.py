@@ -88,7 +88,10 @@ def load_model_with_fallback(
     """Load the model, preferring FlashAttention2 and falling back to SDPA."""
     flash_available = has_flash_attn()
     attn_impl: Optional[str] = None
-    if flash_available:
+    if _is_medgemma_model(model_id):
+        model = load_model(model_id, "sdpa", hf_token=hf_token)
+        attn_impl = "sdpa"
+    elif flash_available:
         try:
             model = load_model(model_id, "flash_attention_2", hf_token=hf_token)
             attn_impl = "flash_attention_2"

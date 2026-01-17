@@ -5,7 +5,9 @@ includes the authoritative steps and notebook links.
 
 ## Single-model CLI generation
 
-Run generation for a single Hugging Face model id (outputs are stored under a per-model slug):
+Run generation for a single Hugging Face model id (outputs are stored under a per-model slug). By
+default, `--branch-batch-size` matches `--branches` so each question batch generates all branches in
+one GPU call.
 
 ```bash
 HF_TOKEN=... python scripts/generate.py \
@@ -14,7 +16,22 @@ HF_TOKEN=... python scripts/generate.py \
   --model HPAI-BSC/Qwen2.5-Aloe-Beta-7B \
   --N 400 \
   --seed 42 \
-  --k 10
+  --k 10 \
+  --branch-batch-size 10
+```
+
+To split branch sampling into multiple GPU batches, lower `--branch-batch-size` while keeping the
+overall `--branches` count:
+
+```bash
+HF_TOKEN=... python scripts/generate.py \
+  --paper from_answers_to_hypotheses \
+  --method branches \
+  --model HPAI-BSC/Qwen2.5-Aloe-Beta-7B \
+  --N 400 \
+  --seed 42 \
+  --branches 10 \
+  --branch-batch-size 5
 ```
 
 ## Reproduce from a run directory

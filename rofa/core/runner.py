@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import time
 import uuid
@@ -9,14 +10,7 @@ from typing import Any, Dict, Optional
 
 from tqdm import tqdm
 
-from .io import (
-    _append_jsonl,
-    _now_utc,
-    load_manifest,
-    load_progress,
-    write_manifest,
-    write_progress,
-)
+from .io import _append_jsonl, _now_utc, load_manifest, load_progress, write_manifest, write_progress
 from .parse import cop_to_letter
 from .question_set import (
     create_question_set,
@@ -28,6 +22,64 @@ from .question_set import (
 )
 from .schemas import GenerationConfig, RunConfig, RunManifest
 
+
+class RunWriter:
+    """Persist run artifacts incrementally during generation."""
+
+    def __init__(
+        self,
+        *,
+        run_id: str,
+        progress_path: str,
+        summary_path: str,
+        full_path: str,
+        write_full_records: bool,
+        position: int,
+        summary_written: int,
+        full_written: int,
+    ) -> None:
+        os.makedirs(os.path.dirname(summary_path), exist_ok=True)
+        self._summary_handle = open(summary_path, "a", encoding="utf-8")
+        self._full_handle = open(full_path, "a", encoding="utf-8") if write_full_records else None
+        self._progress_path = progress_path
+        self._run_id = run_id
+        self.position = position
+        self.summary_written = summary_written
+        self.full_written = full_written
+
+    def write_summary(self, record: Dict[str, Any]) -> None:
+        self._append_jsonl(self._summary_handle, record)
+        self.summary_written += 1
+
+    def write_full(self, record: Dict[str, Any]) -> None:
+        if self._full_handle is None:
+            return
+        self._append_jsonl(self._full_handle, record)
+        self.full_written += 1
+
+    def update_progress(self, *, last_index: Optional[int] = None) -> None:
+        self.position += 1
+        payload = {
+            "run_id": self._run_id,
+            "timestamp": _now_utc(),
+            "position": self.position,
+            "summary_written": self.summary_written,
+            "full_written": self.full_written,
+        }
+        if last_index is not None:
+            payload["last_index"] = last_index
+        write_progress(self._progress_path, payload)
+
+    def close(self) -> None:
+        self._summary_handle.close()
+        if self._full_handle is not None:
+            self._full_handle.close()
+
+    @staticmethod
+    def _append_jsonl(handle, obj: Dict[str, Any]) -> None:
+        handle.write(json.dumps(obj, ensure_ascii=False) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
 
 def _resolve_example(ds, entry: Dict[str, Any], id_index_cache: Dict[str, int]) -> Dict[str, Any]:
     """Resolve a question set entry to a dataset example."""
@@ -320,15 +372,11 @@ def run_generation(config: GenerationConfig) -> Dict[str, Any]:
 
     total = len(qs.examples)
     segment_total = total - position
-    bar = None
-    start_time = time.time()
-    if config.progress:
-        bar = tqdm(total=total, initial=position, dynamic_ncols=True)
-
     id_index_cache: Dict[str, int] = {}
     completed_since_start = 0
 
     if hasattr(config.method_impl, "run_batch"):
+        bar = None
         items = []
         for idx in range(position, total):
             entry = qs.examples[idx]
@@ -365,45 +413,30 @@ def run_generation(config: GenerationConfig) -> Dict[str, Any]:
             "branch_batch_size": config.branch_batch_size or 1,
             "profile": config.model_profile or {},
         }
+        writer = RunWriter(
+            run_id=run_id,
+            progress_path=progress_path,
+            summary_path=summary_path,
+            full_path=full_path,
+            write_full_records=config.write_full_records,
+            position=position,
+            summary_written=summary_written,
+            full_written=full_written,
+        )
+        context["writer"] = writer
 
-        records = config.method_impl.run_batch(items, context)
-        full_records = getattr(config.method_impl, "last_full_records", None)
-
-        for offset, record in enumerate(records):
-            _append_jsonl(summary_path, record)
-            summary_written += 1
-
-            if config.write_full_records and full_records:
-                full_record = full_records[offset]
-                _append_jsonl(full_path, full_record)
-                full_written += 1
-
-            if record.get("prediction") is None and "prediction" in record:
-                print("  Warning: could not extract answer from model output.")
-
-            position = position + 1
-            completed_since_start += 1
-
-            write_progress(
-                progress_path,
-                {
-                    "run_id": run_id,
-                    "timestamp": _now_utc(),
-                    "position": position,
-                    "summary_written": summary_written,
-                    "full_written": full_written,
-                },
-            )
-
-            if bar:
-                bar.update(1)
-                _update_progress_bar(
-                    bar,
-                    completed=completed_since_start,
-                    total=segment_total,
-                    start_time=start_time,
-                )
+        try:
+            config.method_impl.run_batch(items, context)
+        finally:
+            writer.close()
+        position = writer.position
+        summary_written = writer.summary_written
+        full_written = writer.full_written
     else:
+        bar = None
+        start_time = time.time()
+        if config.progress:
+            bar = tqdm(total=total, initial=position, dynamic_ncols=True)
         for idx in range(position, total):
             entry = qs.examples[idx]
             ex = _resolve_example(ds, entry, id_index_cache)

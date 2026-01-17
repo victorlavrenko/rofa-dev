@@ -87,7 +87,7 @@ Contains:
 - `config`: the run configuration:
   - `method`, `model_id`, `seed`, `max_new_tokens`, `n`, `subjects`, `max_per_subject`
   - `dataset_name`, `dataset_split`
-  - `n_branches`, `temperature`, `top_p`, `top_k` (k-sample ensemble only)
+  - `n_branches`, `branch_batch_size`, `temperature`, `top_p`, `top_k` (k-sample ensemble only)
   - `question_set_id`
 
 ## `progress.json`
