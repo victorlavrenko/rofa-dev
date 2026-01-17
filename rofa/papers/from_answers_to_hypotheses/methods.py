@@ -6,6 +6,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Protocol
 
+from tqdm.auto import tqdm
+
 from rofa.core.io import _now_utc
 from rofa.core.generation import (
     build_greedy_kwargs,
@@ -27,8 +29,8 @@ class MethodProtocol(Protocol):
         """Run the method on a single example and return a summary record."""
         ...
 
-    def run_batch(self, items: List[Dict[str, Any]], context: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Run the method on a batch and return summary records."""
+    def run_batch(self, items: List[Dict[str, Any]], context: Dict[str, Any]) -> None:
+        """Run the method on a batch and stream summary records."""
         ...
 
 
@@ -79,7 +81,7 @@ class GreedyDecode:
             "timestamp": _now_utc(),
         }
 
-    def run_batch(self, items: List[Dict[str, Any]], context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def run_batch(self, items: List[Dict[str, Any]], context: Dict[str, Any]) -> None:
         tokenizer = context["tokenizer"]
         model = context["model"]
         max_new_tokens = context["max_new_tokens"]
@@ -88,8 +90,10 @@ class GreedyDecode:
         model_slug = context["model_slug"]
         batch_size_q = context["batch_size_q"]
         profile = context["profile"]
+        writer = context["writer"]
 
         prompts = []
+        item_lookup = {item["index"]: item for item in items}
         for item in items:
             user_prompt = build_user(item["example"])
             prompts.append(
@@ -100,30 +104,22 @@ class GreedyDecode:
             )
 
         greedy_kwargs = build_greedy_kwargs(max_new_tokens=max_new_tokens)
-        outputs, wall_time = run_greedy_batched(
-            prompts,
-            tokenizer=tokenizer,
-            model=model,
-            batch_size_q=batch_size_q,
-            greedy_kwargs=greedy_kwargs,
-            profile=profile,
-        )
-        per_item_time = wall_time / max(1, len(items))
+        pbar = tqdm(total=len(items), desc="greedy (batched)", dynamic_ncols=True)
 
-        records: List[Dict[str, Any]] = []
-        for item in items:
-            example = item["example"]
-            gen = outputs[item["index"]]
-            options = {
-                "A": example.get("opa"),
-                "B": example.get("opb"),
-                "C": example.get("opc"),
-                "D": example.get("opd"),
-            }
-            pred = extract_choice_letter(gen, options=options)
-            gold = cop_to_letter(example["cop"])
-            records.append(
-                {
+        def _handle_chunk(chunk, decoded, chunk_time):
+            per_item_time = chunk_time / max(1, len(chunk))
+            for prompt_item, gen in zip(chunk, decoded):
+                item = item_lookup[prompt_item["item_id"]]
+                example = item["example"]
+                options = {
+                    "A": example.get("opa"),
+                    "B": example.get("opb"),
+                    "C": example.get("opc"),
+                    "D": example.get("opd"),
+                }
+                pred = extract_choice_letter(gen, options=options)
+                gold = cop_to_letter(example["cop"])
+                record = {
                     "index": item["index"],
                     "id": example.get("id"),
                     "question": example.get("question"),
@@ -140,8 +136,23 @@ class GreedyDecode:
                     "seed": seed,
                     "timestamp": _now_utc(),
                 }
-            )
-        return records
+                writer.write_summary(record)
+                if record.get("prediction") is None and "prediction" in record:
+                    print("  Warning: could not extract answer from model output.")
+                writer.update_progress(last_index=item["index"])
+                pbar.update(1)
+
+        run_greedy_batched(
+            prompts,
+            tokenizer=tokenizer,
+            model=model,
+            batch_size_q=batch_size_q,
+            greedy_kwargs=greedy_kwargs,
+            profile=profile,
+            on_chunk=_handle_chunk,
+        )
+        pbar.close()
+        return None
 
 
 @dataclass
@@ -296,7 +307,7 @@ class BranchSamplingEnsemble:
             "timestamp": _now_utc(),
         }
 
-    def run_batch(self, items: List[Dict[str, Any]], context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def run_batch(self, items: List[Dict[str, Any]], context: Dict[str, Any]) -> None:
         tokenizer = context["tokenizer"]
         model = context["model"]
         max_new_tokens = context["max_new_tokens"]
@@ -306,8 +317,10 @@ class BranchSamplingEnsemble:
         batch_size_q = context["batch_size_q"]
         branch_batch_size = context["branch_batch_size"]
         profile = context["profile"]
+        writer = context["writer"]
 
         prompts = []
+        item_lookup = {item["index"]: item for item in items}
         for item in items:
             user_prompt = build_user(item["example"])
             prompts.append(
@@ -323,86 +336,70 @@ class BranchSamplingEnsemble:
             top_p=self.top_p,
             top_k=self.top_k,
         )
-        outputs, branch_seeds, wall_time = run_ensemble_batched(
-            prompts,
-            tokenizer=tokenizer,
-            model=model,
-            batch_size_q=batch_size_q,
-            n_branches=self.n_branches,
-            branch_batch_size=branch_batch_size,
-            sample_kwargs=sample_kwargs,
-            profile=profile,
-            seed=seed,
-        )
-        per_branch_time = wall_time / max(1, len(items) * self.n_branches)
-        records: List[Dict[str, Any]] = []
-        full_records: List[Dict[str, Any]] = []
+        pbar = tqdm(total=len(items), desc="ensemble (batched)", dynamic_ncols=True)
 
-        for item in items:
-            example = item["example"]
-            gold = cop_to_letter(example["cop"])
-            branch_texts = outputs[item["index"]]
-            branch_seed_list = branch_seeds[item["index"]]
-            preds: List[Optional[str]] = []
-            branch_records: List[Dict[str, Any]] = []
-            for j, gen in enumerate(branch_texts):
+        def _handle_chunk(chunk, chunk_outputs, chunk_seeds, chunk_time):
+            per_branch_time = chunk_time / max(1, len(chunk) * self.n_branches)
+            for prompt_item in chunk:
+                item = item_lookup[prompt_item["item_id"]]
+                example = item["example"]
+                gold = cop_to_letter(example["cop"])
+                branch_texts = chunk_outputs[prompt_item["item_id"]]
+                branch_seed_list = chunk_seeds[prompt_item["item_id"]]
+                preds: List[Optional[str]] = []
+                branch_records: List[Dict[str, Any]] = []
                 options = {
                     "A": example.get("opa"),
                     "B": example.get("opb"),
                     "C": example.get("opc"),
                     "D": example.get("opd"),
                 }
-                pred = extract_choice_letter(gen, options=options)
-                preds.append(pred)
-                branch_records.append(
-                    {
-                        "branch": j,
-                        "seed": branch_seed_list[j],
-                        "temperature": self.temperature,
-                        "top_p": self.top_p,
-                        "top_k": self.top_k,
-                        "pred": pred,
-                        "gold": gold,
-                        "is_correct": (pred == gold) if pred is not None else None,
-                        "inference_time_sec": per_branch_time,
-                        "model_output": gen,
-                    }
-                )
+                for j, gen in enumerate(branch_texts):
+                    pred = extract_choice_letter(gen, options=options)
+                    preds.append(pred)
+                    branch_records.append(
+                        {
+                            "branch": j,
+                            "seed": branch_seed_list[j],
+                            "temperature": self.temperature,
+                            "top_p": self.top_p,
+                            "top_k": self.top_k,
+                            "pred": pred,
+                            "gold": gold,
+                            "is_correct": (pred == gold) if pred is not None else None,
+                            "inference_time_sec": per_branch_time,
+                            "model_output": gen,
+                        }
+                    )
 
-            metrics = _diversity_metrics(preds)
-            correct_frac = _correct_fraction(preds, gold)
+                metrics = _diversity_metrics(preds)
+                correct_frac = _correct_fraction(preds, gold)
 
-            leader = metrics["leader"]
-            max_frac = metrics["max_frac"]
-            valid_n = metrics["valid_n"]
+                leader = metrics["leader"]
+                max_frac = metrics["max_frac"]
+                valid_n = metrics["valid_n"]
 
-            if valid_n == 0:
-                class_label = "invalid_all_none"
-                leader_correct = None
-            else:
-                leader_correct = leader == gold
-
-                if metrics["unanimous"]:
-                    class_label = "unanimous"
-                elif max_frac >= 0.8:
-                    class_label = "lead80"
-                elif max_frac >= 0.5:
-                    class_label = "lead50"
+                if valid_n == 0:
+                    class_label = "invalid_all_none"
+                    leader_correct = None
                 else:
-                    class_label = "no_leader"
+                    leader_correct = leader == gold
 
-            full_records.append(
-                {
+                    if metrics["unanimous"]:
+                        class_label = "unanimous"
+                    elif max_frac >= 0.8:
+                        class_label = "lead80"
+                    elif max_frac >= 0.5:
+                        class_label = "lead50"
+                    else:
+                        class_label = "no_leader"
+
+                full_record = {
                     "index": item["index"],
                     "picked_index": item["picked_index"],
                     "id": example.get("id"),
                     "question": example.get("question"),
-                    "options": {
-                        "A": example.get("opa"),
-                        "B": example.get("opb"),
-                        "C": example.get("opc"),
-                        "D": example.get("opd"),
-                    },
+                    "options": options,
                     "gold": gold,
                     "subject_name": item["subject_name"],
                     "model_id": model_id,
@@ -421,14 +418,11 @@ class BranchSamplingEnsemble:
                         "correct_fraction": correct_frac,
                         "leader_correct": leader_correct,
                         "class": class_label,
-                        "wall_time_sec": wall_time,
+                        "wall_time_sec": chunk_time,
                         "mean_branch_time_sec": per_branch_time,
                     },
                 }
-            )
-
-            records.append(
-                {
+                summary_record = {
                     "index": item["index"],
                     "picked_index": item["picked_index"],
                     "id": example.get("id"),
@@ -454,8 +448,27 @@ class BranchSamplingEnsemble:
                     "n_branches": self.n_branches,
                     "timestamp": _now_utc(),
                 }
-            )
+                writer.write_summary(summary_record)
+                writer.write_full(full_record)
+                if summary_record.get("prediction") is None and "prediction" in summary_record:
+                    print("  Warning: could not extract answer from model output.")
+                writer.update_progress(last_index=item["index"])
+                pbar.update(1)
 
-        self.last_full_records = full_records
-        self.last_full_record = full_records[-1] if full_records else None
-        return records
+                self.last_full_record = full_record
+
+        run_ensemble_batched(
+            prompts,
+            tokenizer=tokenizer,
+            model=model,
+            batch_size_q=batch_size_q,
+            n_branches=self.n_branches,
+            branch_batch_size=branch_batch_size,
+            sample_kwargs=sample_kwargs,
+            profile=profile,
+            seed=seed,
+            on_chunk=_handle_chunk,
+        )
+        pbar.close()
+        self.last_full_records = None
+        return None

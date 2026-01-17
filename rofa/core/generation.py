@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from contextlib import nullcontext
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import torch
 from transformers.utils import import_utils
@@ -131,6 +131,7 @@ def run_greedy_batched(
     batch_size_q: int,
     greedy_kwargs: Dict[str, Any],
     profile: Dict[str, Any],
+    on_chunk: Optional[Callable[[List[Dict[str, Any]], List[str], float], None]] = None,
 ) -> Tuple[Dict[Any, str], float]:
     items = _normalize_items(items)
     if batch_size_q < 1:
@@ -164,7 +165,8 @@ def run_greedy_batched(
                 out_ids = model.generate(**gen_kwargs)
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
-            total_time += time.time() - t0
+            chunk_time = time.time() - t0
+            total_time += chunk_time
         except Exception as exc:  # noqa: BLE001
             if _is_cuda_oom(exc) and current_batch > 1:
                 current_batch = max(1, current_batch // 2)
@@ -175,6 +177,8 @@ def run_greedy_batched(
                 continue
             raise
         decoded = _decode_outputs(tokenizer, out_ids, input_lens)
+        if on_chunk is not None:
+            on_chunk(chunk, decoded, chunk_time)
         for item, text in zip(chunk, decoded):
             outputs[item["item_id"]] = text
         idx += len(chunk)
@@ -204,6 +208,12 @@ def run_ensemble_batched(
     sample_kwargs: Dict[str, Any],
     profile: Dict[str, Any],
     seed: Optional[int] = None,
+    on_chunk: Optional[
+        Callable[
+            [List[Dict[str, Any]], Dict[Any, List[str]], Dict[Any, List[Optional[int]]], float],
+            None,
+        ]
+    ] = None,
 ) -> Tuple[Dict[Any, List[str]], Dict[Any, List[Optional[int]]], float]:
     items = _normalize_items(items)
     if batch_size_q < 1:
@@ -231,6 +241,7 @@ def run_ensemble_batched(
     while idx < len(items):
         chunk = items[idx : idx + current_batch]
         branch_offset = 0
+        chunk_time = 0.0
 
         while branch_offset < n_branches:
             batch_branch = min(current_branch_batch, n_branches - branch_offset)
@@ -259,7 +270,9 @@ def run_ensemble_batched(
                     out_ids = model.generate(**gen_kwargs)
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
-                total_time += time.time() - t0
+                batch_time = time.time() - t0
+                total_time += batch_time
+                chunk_time += batch_time
             except Exception as exc:  # noqa: BLE001
                 if generators is not None and isinstance(exc, (TypeError, ValueError)):
                     gen_kwargs.pop("generator", None)
@@ -274,7 +287,9 @@ def run_ensemble_batched(
                         out_ids = model.generate(**gen_kwargs)
                     if torch.cuda.is_available():
                         torch.cuda.synchronize()
-                    total_time += time.time() - t0
+                    batch_time = time.time() - t0
+                    total_time += batch_time
+                    chunk_time += batch_time
                 elif _is_cuda_oom(exc):
                     if current_batch > 1:
                         current_batch = max(1, current_batch // 2)
@@ -311,6 +326,10 @@ def run_ensemble_batched(
             global_row_offset += len(prompts)
             branch_offset += batch_branch
         if branch_offset >= n_branches:
+            if on_chunk is not None:
+                chunk_outputs = {item["item_id"]: outputs[item["item_id"]] for item in chunk}
+                chunk_seeds = {item["item_id"]: branch_seeds[item["item_id"]] for item in chunk}
+                on_chunk(chunk, chunk_outputs, chunk_seeds, chunk_time)
             idx += len(chunk)
 
     return outputs, branch_seeds, total_time

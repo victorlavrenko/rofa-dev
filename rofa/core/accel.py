@@ -113,14 +113,14 @@ def load_model_and_tokenizer(
 def resolve_default_batch_sizes(model_id: str, n_branches: int) -> Dict[str, int]:
     """Return default batch sizing per model id."""
     defaults = {
-        "google/medgemma-1.5-4b-it": (8, 2, 5),
-        "HPAI-BSC/Llama3.1-Aloe-Beta-8B": (4, 1, 5),
-        "m42-health/Llama3-Med42-8B": (4, 1, 5),
-        "HPAI-BSC/Qwen2.5-Aloe-Beta-7B": (4, 1, 5),
-        "BioMistral/BioMistral-7B": (4, 1, 5),
+        "google/medgemma-1.5-4b-it": (8, 2),
+        "HPAI-BSC/Llama3.1-Aloe-Beta-8B": (4, 1),
+        "m42-health/Llama3-Med42-8B": (4, 1),
+        "HPAI-BSC/Qwen2.5-Aloe-Beta-7B": (4, 1),
+        "BioMistral/BioMistral-7B": (4, 1),
     }
-    greedy, ensemble_q, branch = defaults.get(model_id, (4, 1, 5))
-    branch = max(1, min(branch, n_branches))
+    greedy, ensemble_q = defaults.get(model_id, (4, 1))
+    branch = max(1, n_branches)
     return {
         "greedy_batch_size": greedy,
         "ensemble_batch_size_q": ensemble_q,
