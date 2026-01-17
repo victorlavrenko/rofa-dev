@@ -174,6 +174,9 @@ def _ensure_manifest(
             temperature=config.temperature,
             top_p=config.top_p,
             top_k=config.top_k,
+            batch_size_q=config.batch_size_q,
+            ensemble_batch_size_q=config.ensemble_batch_size_q,
+            branch_batch_size=config.branch_batch_size,
             question_set_id=question_set_id,
         )
         updated_manifest = RunManifest(
@@ -200,6 +203,9 @@ def _ensure_manifest(
         temperature=config.temperature,
         top_p=config.top_p,
         top_k=config.top_k,
+        batch_size_q=config.batch_size_q,
+        ensemble_batch_size_q=config.ensemble_batch_size_q,
+        branch_batch_size=config.branch_batch_size,
         question_set_id=question_set_id,
     )
     manifest = RunManifest(
@@ -322,65 +328,141 @@ def run_generation(config: GenerationConfig) -> Dict[str, Any]:
     id_index_cache: Dict[str, int] = {}
     completed_since_start = 0
 
-    for idx in range(position, total):
-        entry = qs.examples[idx]
-        ex = _resolve_example(ds, entry, id_index_cache)
-        entry_hash = entry.get("question_hash")
-        if entry_hash and question_hash(ex) != entry_hash:
-            print(f"  Warning: question hash mismatch at index {idx}.")
-        subj = ex.get("subject_name", "Unknown") or "Unknown"
+    if hasattr(config.method_impl, "run_batch"):
+        items = []
+        for idx in range(position, total):
+            entry = qs.examples[idx]
+            ex = _resolve_example(ds, entry, id_index_cache)
+            entry_hash = entry.get("question_hash")
+            if entry_hash and question_hash(ex) != entry_hash:
+                print(f"  Warning: question hash mismatch at index {idx}.")
+            subj = ex.get("subject_name", "Unknown") or "Unknown"
+            items.append(
+                {
+                    "example": ex,
+                    "index": idx,
+                    "picked_index": idx + 1,
+                    "subject_name": subj,
+                    "gold": cop_to_letter(ex["cop"]),
+                }
+            )
 
+        batch_size_q = config.batch_size_q or 1
+        if config.method != "greedy" and config.ensemble_batch_size_q:
+            batch_size_q = config.ensemble_batch_size_q
         context = {
             "tokenizer": config.tokenizer,
             "model": config.model,
             "max_new_tokens": config.max_new_tokens,
             "seed": config.seed,
-            "index": idx,
-            "picked_index": idx + 1,
-            "subject_name": subj,
-            "gold": cop_to_letter(ex["cop"]),
             "model_id": config.model_id,
             "model_slug": config.model_slug,
             "temperature": config.temperature,
             "top_p": config.top_p,
             "top_k": config.top_k,
             "n_branches": config.n_branches,
+            "batch_size_q": batch_size_q,
+            "branch_batch_size": config.branch_batch_size or 1,
+            "profile": config.model_profile or {},
         }
 
-        record = config.method_impl.run_one(ex, context)
-        _append_jsonl(summary_path, record)
-        summary_written += 1
+        records = config.method_impl.run_batch(items, context)
+        full_records = getattr(config.method_impl, "last_full_records", None)
 
-        full_record = getattr(config.method_impl, "last_full_record", None)
-        if config.write_full_records and full_record is not None:
-            _append_jsonl(full_path, full_record)
-            full_written += 1
+        for offset, record in enumerate(records):
+            _append_jsonl(summary_path, record)
+            summary_written += 1
 
-        if record.get("prediction") is None and "prediction" in record:
-            print("  Warning: could not extract answer from model output.")
+            if config.write_full_records and full_records:
+                full_record = full_records[offset]
+                _append_jsonl(full_path, full_record)
+                full_written += 1
 
-        position = idx + 1
-        completed_since_start += 1
+            if record.get("prediction") is None and "prediction" in record:
+                print("  Warning: could not extract answer from model output.")
 
-        write_progress(
-            progress_path,
-            {
-                "run_id": run_id,
-                "timestamp": _now_utc(),
-                "position": position,
-                "summary_written": summary_written,
-                "full_written": full_written,
-            },
-        )
+            position = position + 1
+            completed_since_start += 1
 
-        if bar:
-            bar.update(1)
-            _update_progress_bar(
-                bar,
-                completed=completed_since_start,
-                total=segment_total,
-                start_time=start_time,
+            write_progress(
+                progress_path,
+                {
+                    "run_id": run_id,
+                    "timestamp": _now_utc(),
+                    "position": position,
+                    "summary_written": summary_written,
+                    "full_written": full_written,
+                },
             )
+
+            if bar:
+                bar.update(1)
+                _update_progress_bar(
+                    bar,
+                    completed=completed_since_start,
+                    total=segment_total,
+                    start_time=start_time,
+                )
+    else:
+        for idx in range(position, total):
+            entry = qs.examples[idx]
+            ex = _resolve_example(ds, entry, id_index_cache)
+            entry_hash = entry.get("question_hash")
+            if entry_hash and question_hash(ex) != entry_hash:
+                print(f"  Warning: question hash mismatch at index {idx}.")
+            subj = ex.get("subject_name", "Unknown") or "Unknown"
+
+            context = {
+                "tokenizer": config.tokenizer,
+                "model": config.model,
+                "max_new_tokens": config.max_new_tokens,
+                "seed": config.seed,
+                "index": idx,
+                "picked_index": idx + 1,
+                "subject_name": subj,
+                "gold": cop_to_letter(ex["cop"]),
+                "model_id": config.model_id,
+                "model_slug": config.model_slug,
+                "temperature": config.temperature,
+                "top_p": config.top_p,
+                "top_k": config.top_k,
+                "n_branches": config.n_branches,
+            }
+
+            record = config.method_impl.run_one(ex, context)
+            _append_jsonl(summary_path, record)
+            summary_written += 1
+
+            full_record = getattr(config.method_impl, "last_full_record", None)
+            if config.write_full_records and full_record is not None:
+                _append_jsonl(full_path, full_record)
+                full_written += 1
+
+            if record.get("prediction") is None and "prediction" in record:
+                print("  Warning: could not extract answer from model output.")
+
+            position = idx + 1
+            completed_since_start += 1
+
+            write_progress(
+                progress_path,
+                {
+                    "run_id": run_id,
+                    "timestamp": _now_utc(),
+                    "position": position,
+                    "summary_written": summary_written,
+                    "full_written": full_written,
+                },
+            )
+
+            if bar:
+                bar.update(1)
+                _update_progress_bar(
+                    bar,
+                    completed=completed_since_start,
+                    total=segment_total,
+                    start_time=start_time,
+                )
 
     if bar:
         bar.close()

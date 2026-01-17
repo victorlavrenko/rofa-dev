@@ -23,6 +23,9 @@ class RunConfig:
     temperature: Optional[float] = None
     top_p: Optional[float] = None
     top_k: Optional[int] = None
+    batch_size_q: Optional[int] = None
+    ensemble_batch_size_q: Optional[int] = None
+    branch_batch_size: Optional[int] = None
     question_set_id: Optional[str] = None
     model_slug: Optional[str] = None
 
@@ -49,11 +52,15 @@ class GenerationConfig:
     temperature: Optional[float] = None
     top_p: Optional[float] = None
     top_k: Optional[int] = None
+    batch_size_q: Optional[int] = None
+    ensemble_batch_size_q: Optional[int] = None
+    branch_batch_size: Optional[int] = None
     progress: bool = False
     write_full_records: bool = False
     tokenizer: Optional[Any] = None
     model: Optional[Any] = None
     method_impl: Optional[Any] = None
+    model_profile: Optional[Dict[str, Any]] = None
 
 
 @dataclass
