@@ -15,7 +15,8 @@ os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 import torch
 from huggingface_hub import login
 
-from rofa.core.model import has_flash_attn, load_model_with_fallback, load_tokenizer
+from rofa.core.accel import load_model_and_tokenizer, resolve_default_batch_sizes
+from rofa.core.model import has_flash_attn
 from rofa.core.model_id import to_slug
 from rofa.core.question_set import create_question_set, load_question_set, save_question_set
 from rofa.core.registry import get_paper, list_method_aliases, resolve_method_key
@@ -60,6 +61,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--top-p", type=float, default=0.8)
     parser.add_argument("--top-k", type=int, default=50)
+    parser.add_argument("--batch-size-q", type=int)
+    parser.add_argument("--ensemble-batch-size-q", type=int)
+    parser.add_argument("--branch-batch-size", type=int)
+    parser.add_argument("--attn-impl", help="Override attention backend (sdpa/flash_attention_2/eager).")
+    parser.add_argument("--dtype", choices=["bfloat16", "float16"], help="Override model dtype.")
     parser.add_argument("--hf-token", help="Optional Hugging Face access token.")
     parser.add_argument(
         "--hf-token-env",
@@ -161,7 +167,7 @@ def _ensure_flash_attn() -> bool:
     return has_flash_attn()
 
 
-def _print_runtime_summary(model) -> None:
+def _print_runtime_summary(model, profile) -> None:
     gpu_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
     dtype = next(model.parameters()).dtype
     gen_config = getattr(model, "generation_config", None)
@@ -171,6 +177,8 @@ def _print_runtime_summary(model) -> None:
     print("use_cache:", getattr(model.config, "use_cache", None))
     print("cache_impl:", getattr(gen_config, "cache_implementation", None))
     print("attn_impl:", getattr(model.config, "attn_implementation", None))
+    print("profile_attn_impl:", profile.get("attn_implementation"))
+    print("profile_dtype:", profile.get("dtype"))
     print("flash_attn_available:", has_flash_attn())
 
 
@@ -224,8 +232,11 @@ def main() -> None:
     _ensure_flash_attn()
 
     try:
-        tokenizer = load_tokenizer(model_id, hf_token=hf_token)
-        model = load_model_with_fallback(model_id, hf_token=hf_token, tokenizer=tokenizer)
+        tokenizer, model, profile = load_model_and_tokenizer(
+            model_id,
+            hf_token=hf_token,
+            overrides={"attn_implementation": args.attn_impl, "dtype": args.dtype},
+        )
     except Exception as exc:  # noqa: BLE001
         message = str(exc)
         if any(code in message for code in ["401", "403", "gated"]):
@@ -235,7 +246,13 @@ def main() -> None:
             ) from exc
         raise
     method, write_full_records = _build_method(method_key, args)
-    _print_runtime_summary(model)
+    defaults = resolve_default_batch_sizes(model_id, args.branches)
+    greedy_batch_size = args.batch_size_q or defaults["greedy_batch_size"]
+    ensemble_batch_size_q = args.ensemble_batch_size_q or defaults["ensemble_batch_size_q"]
+    branch_batch_size = args.branch_batch_size or defaults["branch_batch_size"]
+    if branch_batch_size < 1 or branch_batch_size > args.branches:
+        raise ValueError("branch_batch_size must satisfy 1 <= branch_batch_size <= n_branches.")
+    _print_runtime_summary(model, profile)
 
     config = GenerationConfig(
         method=method_key,
@@ -256,11 +273,15 @@ def main() -> None:
         temperature=args.temperature if method_key != "greedy" else None,
         top_p=args.top_p if method_key != "greedy" else None,
         top_k=args.top_k if method_key != "greedy" else None,
+        batch_size_q=greedy_batch_size,
+        ensemble_batch_size_q=ensemble_batch_size_q,
+        branch_batch_size=branch_batch_size,
         progress=True,
         write_full_records=write_full_records,
         tokenizer=tokenizer,
         model=model,
         method_impl=method,
+        model_profile=profile,
     )
     run_generation(config)
     summary_path = os.path.join(run_dir, "summary.jsonl")
