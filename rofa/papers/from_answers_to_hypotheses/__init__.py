@@ -1,15 +1,14 @@
 """Paper package for 'From Answers to Hypotheses'."""
 
-from rofa.papers.from_answers_to_hypotheses.analysis import load_paper_runs, paper_metrics
-from rofa.papers.from_answers_to_hypotheses.config import (
-    PAPER_ID,
-    PAPER_SPEC,
-    PAPER_TITLE,
-)
-
 
 def default_configs() -> dict:
     """Return default paper configuration values."""
+    from rofa.papers.from_answers_to_hypotheses.config import (
+        PAPER_ID,
+        PAPER_SPEC,
+        PAPER_TITLE,
+    )
+
     return {
         "paper_id": PAPER_ID,
         "title": PAPER_TITLE,
@@ -21,6 +20,8 @@ def default_configs() -> dict:
 
 def run_paper_analysis(run_dirs_or_zips):
     """Run paper analysis from run directories or zip paths."""
+    from rofa.papers.from_answers_to_hypotheses.analysis import load_paper_runs, paper_metrics
+
     df_greedy, df_branches, metadata = load_paper_runs(run_dirs_or_zips)
     return {
         "metadata": metadata,
@@ -29,10 +30,18 @@ def run_paper_analysis(run_dirs_or_zips):
     }
 
 
+def __getattr__(name: str):
+    if name in {"PAPER_ID", "PAPER_SPEC", "PAPER_TITLE"}:
+        from rofa.papers.from_answers_to_hypotheses import config
+
+        return getattr(config, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
+    "default_configs",
+    "run_paper_analysis",
     "PAPER_ID",
     "PAPER_SPEC",
     "PAPER_TITLE",
-    "default_configs",
-    "run_paper_analysis",
 ]
